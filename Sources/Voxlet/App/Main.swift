@@ -8,6 +8,9 @@ enum VoxletMain {
         if arguments.contains("--selftest") {
             exit(SelfTest.run(arguments: arguments))
         }
+        if arguments.contains("--render-previews") {
+            exit(PreviewRenderer.run(arguments: arguments))
+        }
         let app = NSApplication.shared
         let delegate = AppDelegate()
         app.delegate = delegate
