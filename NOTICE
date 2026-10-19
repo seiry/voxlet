@@ -1,0 +1,8 @@
+Voxlet
+Copyright 2026 Seiry Yu
+
+This product includes software adapted from Voxt
+(https://github.com/sgl-project/sglang-omni/tree/main/Voxt), licensed under the Apache License, Version 2.0.
+Adapted parts: the settings window layout and palette, the recording overlay design, the hotkey rules
+(modifier-only and chord shortcuts, hold and tap behaviours), the paste-and-restore text insertion, and the
+Gemini Live setup payload and CJK-aware transcript joining (Sources/Voxlet/Gemini/TranscriptJoiner.swift).
