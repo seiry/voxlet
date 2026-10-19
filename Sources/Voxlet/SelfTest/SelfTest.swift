@@ -1,0 +1,105 @@
+import AVFoundation
+import Foundation
+
+/// `Voxlet --selftest <audio> [--out result.json]` streams a file through the same converter and Live session the
+/// app uses, then writes a JSON report. Config comes from VOXLET_API_KEY / _PROVIDER / _PROJECT / _LOCATION / _MODEL.
+enum SelfTest {
+    static func run(arguments: [String]) -> Int32 {
+        guard let index = arguments.firstIndex(of: "--selftest"), arguments.count > index + 1 else {
+            FileHandle.standardError.write(Data("usage: Voxlet --selftest <audio> [--out result.json]\n".utf8))
+            return 2
+        }
+        let audioPath = arguments[index + 1]
+        let outPath = arguments.firstIndex(of: "--out").flatMap { arguments.count > $0 + 1 ? arguments[$0 + 1] : nil }
+        let env = ProcessInfo.processInfo.environment
+
+        let config = GeminiLiveConfig(
+            provider: GeminiProvider(rawValue: env["VOXLET_PROVIDER"] ?? "") ?? .agentPlatform,
+            apiKey: env["VOXLET_API_KEY"] ?? "",
+            model: env["VOXLET_MODEL"] ?? GeminiLiveConfig.defaultModel,
+            project: env["VOXLET_PROJECT"] ?? "",
+            location: env["VOXLET_LOCATION"] ?? GeminiLiveConfig.defaultLocation,
+            endpointOverride: env["VOXLET_ENDPOINT"] ?? "",
+            languageCodes: RecognitionLanguage.codes(for: env["VOXLET_LANGUAGES"] ?? "")
+        )
+
+        var report: [String: Any] = [
+            "audioFile": audioPath,
+            "provider": config.provider.rawValue,
+            "endpoint": config.endpoint,
+            "model": config.qualifiedModel,
+            "startedAt": ISO8601DateFormatter().string(from: Date()),
+        ]
+        var rawUsage: [[String: Any]] = []
+        var interimCount = 0
+        let started = Date()
+        var setupAt: Date?
+        var exitCode: Int32 = 1
+
+        do {
+            let file = try AVAudioFile(forReading: URL(fileURLWithPath: audioPath))
+            let format = file.processingFormat
+            report["sourceFormat"] = "\(Int(format.sampleRate)) Hz, \(format.channelCount) ch"
+            guard let converter = PCM16Converter(inputFormat: format) else { throw VoxletError("no converter") }
+
+            let session = GeminiLiveSession(config: config)
+            session.onSetupComplete = { setupAt = Date() }
+            session.onTranscript = { _ in interimCount += 1 }
+            session.onRawUsage = { rawUsage.append($0) }
+            var runtimeError: Error?
+            session.onFailure = { runtimeError = $0 }
+            try session.start()
+
+            // 1024-frame chunks like the mic tap delivers them, at real time unless VOXLET_SPEED says otherwise.
+            let chunkFrames: AVAudioFrameCount = 1024
+            let speed = max(Double(env["VOXLET_SPEED"] ?? "") ?? 1, 0.1)
+            report["streamSpeed"] = speed
+            let pace = Double(chunkFrames) / format.sampleRate / speed
+            while file.framePosition < file.length, runtimeError == nil {
+                guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: chunkFrames) else { break }
+                try file.read(into: buffer, frameCount: chunkFrames)
+                if let pcm = converter.convert(buffer) { session.sendAudio(pcm) }
+                RunLoop.main.run(until: Date().addingTimeInterval(pace))
+            }
+            if let runtimeError { throw runtimeError }
+
+            let finishStarted = Date()
+            var outcome: Result<GeminiLiveResult, Error>?
+            session.finish { outcome = $0 }
+            while outcome == nil { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
+
+            switch outcome! {
+            case .success(let result):
+                report["transcript"] = result.text
+                report["finishReason"] = result.finishReason
+                report["finishLatencyMs"] = Int(Date().timeIntervalSince(finishStarted) * 1000)
+                report["audioSeconds"] = (result.audioSeconds * 100).rounded() / 100
+                report["usage"] = [
+                    "audioInputTokens": result.usage.audioInputTokens,
+                    "textInputTokens": result.usage.textInputTokens,
+                    "outputTokens": result.usage.outputTokens,
+                    "reportedByServer": result.usage.reported,
+                ]
+                report["estimatedCostUSD"] = Pricing.cost(of: result.usage)
+                report["priceAudioInputPerMillion"] = Pricing.audioInputPerMillion
+                report["priceTextOutputPerMillion"] = Pricing.textOutputPerMillion
+                exitCode = result.text.isEmpty ? 1 : 0
+            case .failure(let error):
+                report["error"] = error.localizedDescription
+            }
+        } catch {
+            report["error"] = error.localizedDescription
+        }
+
+        report["setupLatencyMs"] = setupAt.map { Int($0.timeIntervalSince(started) * 1000) } ?? NSNull()
+        report["transcriptUpdates"] = interimCount
+        report["rawUsageMessages"] = rawUsage
+        report["passed"] = exitCode == 0
+
+        let data = (try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])) ?? Data()
+        FileHandle.standardOutput.write(data)
+        FileHandle.standardOutput.write(Data("\n".utf8))
+        if let outPath { try? data.write(to: URL(fileURLWithPath: outPath)) }
+        return exitCode
+    }
+}
