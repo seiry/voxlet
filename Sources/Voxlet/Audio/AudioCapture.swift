@@ -27,13 +27,15 @@ final class AudioCapture {
             )
         }
 
-        // Tap at the hardware rate; a mismatched tap format crashes with "Input HW format and tap format not matching".
+        // Voxt's recipe: the node's channel layout at the hardware sample rate. Anything else can crash with
+        // "Input HW format and tap format not matching".
         let hardware = input.inputFormat(forBus: 0)
-        guard hardware.sampleRate > 0, hardware.channelCount > 0,
+        let channels = input.outputFormat(forBus: 0).channelCount
+        guard hardware.sampleRate > 0, channels > 0,
               let tapFormat = AVAudioFormat(
                   commonFormat: .pcmFormatFloat32,
                   sampleRate: hardware.sampleRate,
-                  channels: hardware.channelCount,
+                  channels: channels,
                   interleaved: false
               ),
               let converter = PCM16Converter(inputFormat: tapFormat)

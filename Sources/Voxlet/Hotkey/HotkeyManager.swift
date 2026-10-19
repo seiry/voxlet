@@ -205,14 +205,20 @@ final class HotkeyManager {
         switch event.kind {
         case .flagsChanged:
             let matched = event.modifiers == hotkey.modifiers
+            // fn → fn+⇧ is a different combo being built, not a release of fn.
+            let widened = !matched && event.modifiers.isSuperset(of: hotkey.modifiers)
             if matched && !modifierMatched {
                 candidateStartedAt = Date()
                 candidateCancelled = false
                 if behavior == .longPress { schedulePendingStart() }
-            } else if !matched && modifierMatched {
+                modifierMatched = true
+            } else if widened && modifierMatched {
+                candidateCancelled = true
+                if behavior == .longPress, !holdStarted { cancelPendingStart() }
+            } else if !matched && !widened && modifierMatched {
                 releaseModifierCandidate()
+                modifierMatched = false
             }
-            modifierMatched = matched
         case .keyDown:
             // fn+A must not trigger a bare fn binding.
             guard modifierMatched else { return }
