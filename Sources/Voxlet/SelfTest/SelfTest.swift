@@ -70,7 +70,7 @@ enum SelfTest {
                 if let pcm = converter.convert(buffer) {
                     session.sendAudio(pcm)
                     let loudness = meter.level(for: pcm)
-                    let bands = spectrum.analyze(pcm, gated: loudness == 0)
+                    let bands = spectrum.analyze(pcm, loudness: loudness)
                     windowPeak = max(windowPeak, loudness)
                     bandPeaks = zip(bandPeaks, bands).map { max($0, $1) }
                     windowBytes += pcm.count

@@ -17,47 +17,56 @@ final class OverlayModel: ObservableObject {
 }
 
 /// A live spectrum in the style of the Dynamic Island music visualiser: the voice bands are mirrored across
-/// 16 bars with the lowest band in the middle, and each bar eases toward its band's peak since the last frame.
-final class WaveformModel: ObservableObject {
+/// 16 bars with the lowest band in the middle. Bars are stepped by the screen's CADisplayLink, the macOS
+/// counterpart of requestAnimationFrame, so they run at 120 Hz on ProMotion displays. Easing uses the real
+/// frame interval, rising in about 85 ms and settling in about 200 ms at any refresh rate.
+final class WaveformModel: NSObject, ObservableObject {
     static let barCount = 16
-    private static let framesPerSecond = 30.0
-    private static let riseSmoothing: Float = 0.55
-    private static let fallSmoothing: Float = 0.22
+    private static let riseTimeConstant: Float = 0.085
+    private static let fallTimeConstant: Float = 0.2
     private static let silenceFloor: Float = 0.03
 
     @Published private(set) var bars = [Float](repeating: 0, count: barCount)
 
-    private var peaks = [Float](repeating: 0, count: SpectrumAnalyzer.bandCount)
+    /// Held between audio chunks: the mic delivers ~47 chunks/s, fewer than the screen draws frames, and
+    /// dropping the target to zero on frames without new data made the bars stutter.
+    private var targets = [Float](repeating: 0, count: SpectrumAnalyzer.bandCount)
     private var smoothed = [Float](repeating: 0, count: SpectrumAnalyzer.bandCount)
-    private var timer: Timer?
+    private var displayLink: CADisplayLink?
+    private var lastTimestamp: CFTimeInterval?
 
     func ingest(_ bands: [Float]) {
-        for (index, value) in bands.prefix(peaks.count).enumerated() {
-            peaks[index] = max(peaks[index], max(0, min(value, 1)))
+        for (index, value) in bands.prefix(targets.count).enumerated() {
+            targets[index] = max(0, min(value, 1))
         }
     }
 
     func setActive(_ active: Bool) {
         if active {
-            guard timer == nil else { return }
-            timer = Timer.scheduledTimer(withTimeInterval: 1 / Self.framesPerSecond, repeats: true) { [weak self] _ in
-                self?.advance()
-            }
+            guard displayLink == nil, let screen = NSScreen.main ?? NSScreen.screens.first else { return }
+            let link = screen.displayLink(target: self, selector: #selector(step(_:)))
+            link.preferredFrameRateRange = CAFrameRateRange(minimum: 60, maximum: 120, preferred: 120)
+            link.add(to: .main, forMode: .common)
+            displayLink = link
         } else {
-            timer?.invalidate()
-            timer = nil
+            displayLink?.invalidate()
+            displayLink = nil
+            lastTimestamp = nil
             bars = [Float](repeating: 0, count: Self.barCount)
-            peaks = peaks.map { _ in 0 }
+            targets = targets.map { _ in 0 }
             smoothed = smoothed.map { _ in 0 }
         }
     }
 
-    private func advance() {
+    @objc private func step(_ link: CADisplayLink) {
+        // Clamp the gap so a stall (window server busy, screen asleep) eases in rather than jumping.
+        let elapsed = Float(min(max(link.timestamp - (lastTimestamp ?? link.timestamp - 1.0 / 120), 0), 0.05))
+        lastTimestamp = link.timestamp
+        let rise = 1 - exp(-elapsed / Self.riseTimeConstant)
+        let fall = 1 - exp(-elapsed / Self.fallTimeConstant)
         for band in smoothed.indices {
-            let target = peaks[band] < Self.silenceFloor ? 0 : peaks[band]
-            let factor = target > smoothed[band] ? Self.riseSmoothing : Self.fallSmoothing
-            smoothed[band] += (target - smoothed[band]) * factor
-            peaks[band] = 0
+            let target = targets[band] < Self.silenceFloor ? 0 : targets[band]
+            smoothed[band] += (target - smoothed[band]) * (target > smoothed[band] ? rise : fall)
         }
         bars = Self.mirrored(smoothed)
     }

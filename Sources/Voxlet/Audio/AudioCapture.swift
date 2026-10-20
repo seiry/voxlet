@@ -48,7 +48,7 @@ final class AudioCapture {
         input.installTap(onBus: 0, bufferSize: 1024, format: tapFormat) { [weak self] buffer, _ in
             guard let self, let pcm = self.converter?.convert(buffer) else { return }
             self.onPCM?(pcm)
-            let bands = self.spectrum.analyze(pcm, gated: self.meter.level(for: pcm) == 0)
+            let bands = self.spectrum.analyze(pcm, loudness: self.meter.level(for: pcm))
             DispatchQueue.main.async { self.onSpectrum?(bands) }
         }
         engine.prepare()
