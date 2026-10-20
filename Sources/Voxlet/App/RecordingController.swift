@@ -62,7 +62,7 @@ final class RecordingController: ObservableObject {
         self.session = session
         setState(.recording)
         overlay.showRecording()
-        Sounds.play(.start)
+        Sounds.play()
     }
 
     func stop() {
@@ -72,7 +72,7 @@ final class RecordingController: ObservableObject {
             guard let self else { return }
             self.capture.stop()
             self.overlay.showProcessing()
-            Sounds.play(.stop)
+            Sounds.play()
             session.finish { [weak self] result in self?.handleFinish(result) }
         }
     }
@@ -125,11 +125,9 @@ final class RecordingController: ObservableObject {
 }
 
 enum Sounds {
-    enum Cue { case start, stop }
-
-    static func play(_ cue: Cue) {
+    /// The same soft cue for start and stop.
+    static func play() {
         guard Prefs.bool(Prefs.interactionSounds) else { return }
-        let name = cue == .start ? "Tink" : "Pop"
-        NSSound(named: NSSound.Name(name))?.play()
+        NSSound(named: NSSound.Name("Pop"))?.play()
     }
 }

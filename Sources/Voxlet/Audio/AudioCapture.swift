@@ -10,6 +10,8 @@ final class AudioCapture {
 
     private let engine = AVAudioEngine()
     private var converter: PCM16Converter?
+    /// Lives across recordings so the learned noise floor carries over. Touched only on the audio thread.
+    private var meter = AudioLevelMeter()
 
     var isRunning: Bool { engine.isRunning }
 
@@ -45,7 +47,7 @@ final class AudioCapture {
         input.installTap(onBus: 0, bufferSize: 1024, format: tapFormat) { [weak self] buffer, _ in
             guard let self, let pcm = self.converter?.convert(buffer) else { return }
             self.onPCM?(pcm)
-            let level = PCM16Converter.level(of: pcm)
+            let level = self.meter.level(for: pcm)
             DispatchQueue.main.async { self.onLevel?(level) }
         }
         engine.prepare()

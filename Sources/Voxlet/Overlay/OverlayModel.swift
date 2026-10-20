@@ -16,13 +16,14 @@ final class OverlayModel: ObservableObject {
 }
 
 /// Rolling bar history like Voxt's RecentAudioWaveformState: 16 bars over ~0.8 s at 20 fps,
-/// fast rise and slow fall so speech reads as motion rather than flicker.
+/// fast rise and slow fall so speech reads as motion rather than flicker. Levels arrive already gated and
+/// scaled by AudioLevelMeter, so no extra lift happens here.
 final class WaveformModel: ObservableObject {
     static let barCount = 16
     private static let framesPerSecond = 20.0
-    private static let riseSmoothing: Float = 0.82
-    private static let fallSmoothing: Float = 0.24
-    private static let silenceFloor: Float = 0.01
+    private static let riseSmoothing: Float = 0.7
+    private static let fallSmoothing: Float = 0.3
+    private static let silenceFloor: Float = 0.03
 
     @Published private(set) var bars = [Float](repeating: 0, count: barCount)
 
@@ -31,9 +32,7 @@ final class WaveformModel: ObservableObject {
     private var timer: Timer?
 
     func ingest(_ level: Float) {
-        // Voxt lifts quiet input before it reaches the bars.
-        let lifted = Float(min(1.0, pow(Double(max(0, min(level, 1))), 0.72) * 1.24))
-        peakSinceFrame = max(peakSinceFrame, lifted)
+        peakSinceFrame = max(peakSinceFrame, max(0, min(level, 1)))
     }
 
     func setActive(_ active: Bool) {
@@ -63,12 +62,10 @@ final class WaveformModel: ObservableObject {
     }
 
     static func barHeight(_ level: Float, min minHeight: CGFloat = 3.2, max maxHeight: CGFloat = 22) -> CGFloat {
-        let emphasized = CGFloat(Swift.min(1.0, pow(Double(Swift.max(0, Swift.min(level, 1))), 0.9) * 1.02))
-        return Swift.max(minHeight, Swift.min(maxHeight, minHeight + (maxHeight - minHeight) * emphasized))
+        minHeight + (maxHeight - minHeight) * CGFloat(Swift.max(0, Swift.min(level, 1)))
     }
 
     static func glowOpacity(_ level: Float) -> Double {
-        let emphasized = Double(barHeight(level, min: 0, max: 1))
-        return Swift.min(0.24, 0.04 + Swift.max(0, emphasized - 0.05) * 0.26)
+        Swift.min(0.24, 0.04 + Swift.max(0, Double(level) - 0.05) * 0.26)
     }
 }

@@ -55,12 +55,28 @@ enum SelfTest {
             let speed = max(Double(env["VOXLET_SPEED"] ?? "") ?? 1, 0.1)
             report["streamSpeed"] = speed
             let pace = Double(chunkFrames) / format.sampleRate / speed
+            // The overlay meter over the same chunks: one digit (0-9) per 100 ms window, peak level.
+            var meter = AudioLevelMeter()
+            var meterTrace = ""
+            var windowPeak: Float = 0
+            var windowBytes = 0
             while file.framePosition < file.length, runtimeError == nil {
                 guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: chunkFrames) else { break }
                 try file.read(into: buffer, frameCount: chunkFrames)
-                if let pcm = converter.convert(buffer) { session.sendAudio(pcm) }
+                if let pcm = converter.convert(buffer) {
+                    session.sendAudio(pcm)
+                    windowPeak = max(windowPeak, meter.level(for: pcm))
+                    windowBytes += pcm.count
+                    if windowBytes >= 3200 {
+                        meterTrace += String(min(9, Int(windowPeak * 10)))
+                        windowPeak = 0
+                        windowBytes = 0
+                    }
+                }
                 RunLoop.main.run(until: Date().addingTimeInterval(pace))
             }
+            report["meterTrace"] = meterTrace
+            report["meterNoiseFloorDb"] = (meter.floorDb * 10).rounded() / 10
             if let runtimeError { throw runtimeError }
 
             let finishStarted = Date()

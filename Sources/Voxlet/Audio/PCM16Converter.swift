@@ -38,18 +38,4 @@ final class PCM16Converter {
         guard status != .error, output.frameLength > 0, let samples = output.int16ChannelData else { return nil }
         return Data(bytes: samples[0], count: Int(output.frameLength) * MemoryLayout<Int16>.size)
     }
-
-    /// Voxt's meter: RMS scaled by 2.4 and clamped, which reads well for speech.
-    static func level(of pcm: Data) -> Float {
-        let count = pcm.count / 2
-        guard count > 0 else { return 0 }
-        var sum: Double = 0
-        pcm.withUnsafeBytes { raw in
-            for sample in raw.bindMemory(to: Int16.self) {
-                let value = Double(sample) / 32768
-                sum += value * value
-            }
-        }
-        return Float(min(1, sqrt(sum / Double(count)) * 2.4))
-    }
 }
