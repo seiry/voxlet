@@ -68,7 +68,8 @@ enum Prefs {
             project: string(vertexProject),
             location: string(vertexLocation),
             endpointOverride: string(endpointOverride),
-            languageCodes: RecognitionLanguage.codes(for: string(recognitionLanguage))
+            languageCodes: RecognitionLanguage.codes(for: string(recognitionLanguage)),
+            vocabulary: VocabularyStore.shared.terms
         )
     }
 }

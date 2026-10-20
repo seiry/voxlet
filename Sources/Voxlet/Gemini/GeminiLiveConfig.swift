@@ -29,6 +29,7 @@ struct GeminiLiveConfig {
     var location: String
     var endpointOverride: String
     var languageCodes: [String]
+    var vocabulary: [String] = []
 
     var endpoint: String {
         let custom = endpointOverride.trimmed
@@ -74,15 +75,19 @@ struct GeminiLiveConfig {
     }
 
     func setupPayload() -> [String: Any] {
-        [
+        // An empty language list asks Gemini to auto-detect, which also keeps code-mixing working.
+        var transcription: [String: Any] = [
+            "languageCodes": languageCodes,
+            "mode": "SMART",
+        ]
+        if !vocabulary.isEmpty {
+            transcription["customVocabulary"] = Array(vocabulary.prefix(VocabularyStore.maxTermsSent))
+        }
+        return [
             "setup": [
                 "model": qualifiedModel,
                 "generationConfig": ["responseModalities": ["TEXT"]],
-                // An empty language list asks Gemini to auto-detect, which also keeps code-mixing working.
-                "inputAudioTranscription": [
-                    "languageCodes": languageCodes,
-                    "mode": "SMART",
-                ] as [String: Any],
+                "inputAudioTranscription": transcription,
             ] as [String: Any],
         ]
     }

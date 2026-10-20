@@ -20,7 +20,10 @@ enum SelfTest {
             project: env["VOXLET_PROJECT"] ?? "",
             location: env["VOXLET_LOCATION"] ?? GeminiLiveConfig.defaultLocation,
             endpointOverride: env["VOXLET_ENDPOINT"] ?? "",
-            languageCodes: RecognitionLanguage.codes(for: env["VOXLET_LANGUAGES"] ?? "")
+            languageCodes: RecognitionLanguage.codes(for: env["VOXLET_LANGUAGES"] ?? ""),
+            // VOXLET_VOCABULARY (comma separated, may be empty) overrides the vocabulary file for repeatable runs.
+            vocabulary: env["VOXLET_VOCABULARY"].map { $0.split(separator: ",").map { String($0).trimmed }.filter { !$0.isEmpty } }
+                ?? VocabularyStore.shared.terms
         )
 
         var report: [String: Any] = [
@@ -28,6 +31,7 @@ enum SelfTest {
             "provider": config.provider.rawValue,
             "endpoint": config.endpoint,
             "model": config.qualifiedModel,
+            "vocabulary": config.vocabulary,
             "startedAt": ISO8601DateFormatter().string(from: Date()),
         ]
         var rawUsage: [[String: Any]] = []

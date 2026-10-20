@@ -15,6 +15,7 @@ final class RecordingController: ObservableObject {
     @Published private(set) var state: State = .idle
 
     let overlay = OverlayWindowController()
+    private let toast = ToastWindowController()
     private let capture = AudioCapture()
     private var session: GeminiLiveSession?
     private var targetApp: NSRunningApplication?
@@ -31,6 +32,22 @@ final class RecordingController: ObservableObject {
 
     func start() {
         guard state == .idle else { return }
+        // As in Voxt, a short selection turns the shortcut into "add to vocabulary"; anything longer is text to
+        // dictate over, and an invalid selection falls through to dictation.
+        if let term = SelectionReader.selectedText().flatMap(VocabularyStore.selectionCandidate) {
+            switch VocabularyStore.shared.add(term) {
+            case .added(let added):
+                toast.show(L10n.format("Added to vocabulary: %@", added))
+                Sounds.play()
+                return
+            case .duplicate(let existing):
+                toast.show(L10n.format("Already in vocabulary: %@", existing))
+                return
+            case .invalid:
+                break
+            }
+        }
+
         let config = Prefs.liveConfig()
         if let problem = config.validationError {
             overlay.showStatus(problem, hideAfter: Self.errorStatusDuration)

@@ -102,6 +102,7 @@ struct HotkeySettingsPage: View {
 
             SettingsCard(title: L10n.t("Tips")) {
                 tip("escape", L10n.t("Press Esc while recording to cancel without pasting anything."))
+                tip("text.book.closed", L10n.t("Select a word and press the shortcut to add it to the vocabulary instead of dictating."))
                 tip("globe", L10n.t("Using fn? Set System Settings → Keyboard → “Press 🌐 key to” to “Do Nothing”, or macOS will also open the emoji picker or dictation."))
                 tip("hand.raised", L10n.t("Modifier-only shortcuts tell left and right apart, so Right ⌘ leaves Left ⌘ free for normal shortcuts."))
             }

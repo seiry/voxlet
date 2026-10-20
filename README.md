@@ -14,6 +14,10 @@ dictionary, no LLM rewrite, no meeting mode). Gemini's `SMART` transcription mod
   **hold to talk** or **tap to toggle**. Esc cancels.
 - Voxt-style floating card with a live waveform and the running transcript.
 - Paste into the focused app, then restore the previous clipboard (or keep the result, if you prefer).
+- **Vocabulary**: names and jargon sent to Gemini as `customVocabulary`, kept in
+  `~/.config/voxlet/vocabulary.txt` (plain text, one term per line, `#` for comments) and editable in Settings or
+  any editor. Select a word anywhere and press the dictation shortcut to add it instead of dictating, as in Voxt
+  (at most 5 words and 10 CJK characters in a row; a longer selection is dictated over).
 - **Usage and cost**: token counts from the server's `usageMetadata` for each dictation, totals for today,
   this month and all time, with editable prices.
 - English and Simplified Chinese UI.

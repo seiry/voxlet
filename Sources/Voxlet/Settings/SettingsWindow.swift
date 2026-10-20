@@ -7,6 +7,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     case model
     case permissions
     case hotkey
+    case vocabulary
     case usage
     case about
 
@@ -18,6 +19,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .model: return L10n.t("Model")
         case .permissions: return L10n.t("Permissions")
         case .hotkey: return L10n.t("Hotkey")
+        case .vocabulary: return L10n.t("Vocabulary")
         case .usage: return L10n.t("Usage")
         case .about: return L10n.t("About")
         }
@@ -29,6 +31,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .model: return "cpu"
         case .permissions: return "lock.shield"
         case .hotkey: return "keyboard"
+        case .vocabulary: return "text.book.closed"
         case .usage: return "chart.bar.xaxis"
         case .about: return "info.circle"
         }
@@ -126,6 +129,7 @@ struct SettingsRootView: View {
         case .model: ModelSettingsPage()
         case .permissions: PermissionsSettingsPage()
         case .hotkey: HotkeySettingsPage()
+        case .vocabulary: VocabularySettingsPage()
         case .usage: UsageSettingsPage()
         case .about: AboutSettingsPage()
         }
