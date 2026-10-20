@@ -12,7 +12,7 @@ final class OverlayWindowController {
         cancelHide()
         model.status = ""
         model.transcript = ""
-        model.level = 0
+        model.bands = []
         model.phase = .recording
         model.presentationID = UUID()
         present()
@@ -28,8 +28,8 @@ final class OverlayWindowController {
         model.transcript = text
     }
 
-    func updateLevel(_ level: Float) {
-        model.level = level
+    func updateSpectrum(_ bands: [Float]) {
+        model.bands = bands
     }
 
     /// A one-line status under the bars that clears itself, Voxt's showOverlayStatus with a 2.4 s default.

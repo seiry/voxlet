@@ -8,31 +8,33 @@ final class OverlayModel: ObservableObject {
     }
 
     @Published var phase: Phase = .hidden
-    @Published var level: Float = 0
+    /// Latest voice bands from SpectrumAnalyzer, low to high.
+    @Published var bands: [Float] = []
     @Published var transcript = ""
     @Published var status = ""
     /// Bumped on every show so the card replays its entrance animation.
     @Published var presentationID = UUID()
 }
 
-/// Rolling bar history like Voxt's RecentAudioWaveformState: 16 bars over ~0.8 s at 20 fps,
-/// fast rise and slow fall so speech reads as motion rather than flicker. Levels arrive already gated and
-/// scaled by AudioLevelMeter, so no extra lift happens here.
+/// A live spectrum in the style of the Dynamic Island music visualiser: the voice bands are mirrored across
+/// 16 bars with the lowest band in the middle, and each bar eases toward its band's peak since the last frame.
 final class WaveformModel: ObservableObject {
     static let barCount = 16
-    private static let framesPerSecond = 20.0
-    private static let riseSmoothing: Float = 0.7
-    private static let fallSmoothing: Float = 0.3
+    private static let framesPerSecond = 30.0
+    private static let riseSmoothing: Float = 0.55
+    private static let fallSmoothing: Float = 0.22
     private static let silenceFloor: Float = 0.03
 
     @Published private(set) var bars = [Float](repeating: 0, count: barCount)
 
-    private var peakSinceFrame: Float = 0
-    private var smoothed: Float = 0
+    private var peaks = [Float](repeating: 0, count: SpectrumAnalyzer.bandCount)
+    private var smoothed = [Float](repeating: 0, count: SpectrumAnalyzer.bandCount)
     private var timer: Timer?
 
-    func ingest(_ level: Float) {
-        peakSinceFrame = max(peakSinceFrame, max(0, min(level, 1)))
+    func ingest(_ bands: [Float]) {
+        for (index, value) in bands.prefix(peaks.count).enumerated() {
+            peaks[index] = max(peaks[index], max(0, min(value, 1)))
+        }
     }
 
     func setActive(_ active: Bool) {
@@ -45,20 +47,28 @@ final class WaveformModel: ObservableObject {
             timer?.invalidate()
             timer = nil
             bars = [Float](repeating: 0, count: Self.barCount)
-            smoothed = 0
-            peakSinceFrame = 0
+            peaks = peaks.map { _ in 0 }
+            smoothed = smoothed.map { _ in 0 }
         }
     }
 
     private func advance() {
-        let target = peakSinceFrame < Self.silenceFloor ? 0 : peakSinceFrame
-        let factor = target > smoothed ? Self.riseSmoothing : Self.fallSmoothing
-        smoothed += (target - smoothed) * factor
-        peakSinceFrame = 0
-        var next = bars
-        next.removeFirst()
-        next.append(smoothed)
-        bars = next
+        for band in smoothed.indices {
+            let target = peaks[band] < Self.silenceFloor ? 0 : peaks[band]
+            let factor = target > smoothed[band] ? Self.riseSmoothing : Self.fallSmoothing
+            smoothed[band] += (target - smoothed[band]) * factor
+            peaks[band] = 0
+        }
+        bars = Self.mirrored(smoothed)
+    }
+
+    /// Band 0 lands on the two centre bars and the highest band on the outer edges.
+    static func mirrored(_ bands: [Float]) -> [Float] {
+        let centre = Double(barCount - 1) / 2
+        return (0..<barCount).map { bar in
+            let band = Int(abs(Double(bar) - centre))
+            return bands.indices.contains(band) ? bands[band] : 0
+        }
     }
 
     static func barHeight(_ level: Float, min minHeight: CGFloat = 3.2, max maxHeight: CGFloat = 22) -> CGFloat {

@@ -64,7 +64,8 @@ enum PreviewRenderer {
         return 0
     }
 
-    private static let previewBars: [Float] = [0.05, 0.1, 0.2, 0.35, 0.5, 0.42, 0.6, 0.78, 0.66, 0.5, 0.7, 0.9, 0.62, 0.4, 0.28, 0.15]
+    /// A plausible voiced vowel: strong low bands, falling toward the top, mirrored like the live view.
+    private static let previewBars = WaveformModel.mirrored([0.72, 0.95, 0.8, 0.58, 0.46, 0.3, 0.2, 0.1])
 
     private static func render<V: View>(_ view: V, size: NSSize, appearance: NSAppearance.Name, background: NSColor, to url: URL) {
         let hosting = NSHostingView(rootView: view.frame(width: size.width, height: size.height))

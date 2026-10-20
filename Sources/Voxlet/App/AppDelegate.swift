@@ -46,7 +46,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         var tick = 0
         Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { timer in
             tick += 1
-            overlay.updateLevel(Float(0.25 + 0.55 * abs(sin(Double(tick) * 0.35)) * Double.random(in: 0.6...1)))
+            overlay.updateSpectrum((0..<SpectrumAnalyzer.bandCount).map { band in
+                Float(max(0, 0.9 - Double(band) * 0.1) * abs(sin(Double(tick) * 0.3 + Double(band))) * Double.random(in: 0.6...1))
+            })
             overlay.updateTranscript(String(text.prefix(min(text.count, tick / 3))))
             if tick > 400 { timer.invalidate() }
         }

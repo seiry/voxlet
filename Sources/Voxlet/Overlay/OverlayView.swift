@@ -43,7 +43,7 @@ struct OverlayView: View {
             .animation(.spring(response: 0.35, dampingFraction: 0.5, blendDuration: 0.1), value: appeared)
             .onChange(of: model.presentationID) { replayEntrance() }
             .onChange(of: model.phase) { updateWaveformActivity() }
-            .onChange(of: model.level) { waveform.ingest(model.level) }
+            .onChange(of: model.bands) { waveform.ingest(model.bands) }
             .onAppear {
                 updateWaveformActivity()
                 replayEntrance()

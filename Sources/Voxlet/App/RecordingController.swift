@@ -47,7 +47,7 @@ final class RecordingController: ObservableObject {
         session.onTranscript = { [weak self] text in self?.overlay.updateTranscript(text) }
         session.onFailure = { [weak self] error in self?.handleRuntimeFailure(error) }
         capture.onPCM = { [weak session] pcm in session?.sendAudio(pcm) }
-        capture.onLevel = { [weak self] level in self?.overlay.updateLevel(level) }
+        capture.onSpectrum = { [weak self] bands in self?.overlay.updateSpectrum(bands) }
 
         do {
             try session.start()

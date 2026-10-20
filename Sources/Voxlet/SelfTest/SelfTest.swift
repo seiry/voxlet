@@ -55,27 +55,37 @@ enum SelfTest {
             let speed = max(Double(env["VOXLET_SPEED"] ?? "") ?? 1, 0.1)
             report["streamSpeed"] = speed
             let pace = Double(chunkFrames) / format.sampleRate / speed
-            // The overlay meter over the same chunks: one digit (0-9) per 100 ms window, peak level.
+            // The overlay's meter and spectrum over the same chunks, one entry per 100 ms window (peak, 0-9):
+            // meterTrace is overall loudness, spectrumTrace is the 8 voice bands from low to high.
             var meter = AudioLevelMeter()
+            let spectrum = SpectrumAnalyzer()
             var meterTrace = ""
+            var spectrumTrace: [String] = []
             var windowPeak: Float = 0
+            var bandPeaks = [Float](repeating: 0, count: SpectrumAnalyzer.bandCount)
             var windowBytes = 0
             while file.framePosition < file.length, runtimeError == nil {
                 guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: chunkFrames) else { break }
                 try file.read(into: buffer, frameCount: chunkFrames)
                 if let pcm = converter.convert(buffer) {
                     session.sendAudio(pcm)
-                    windowPeak = max(windowPeak, meter.level(for: pcm))
+                    let loudness = meter.level(for: pcm)
+                    let bands = spectrum.analyze(pcm, gated: loudness == 0)
+                    windowPeak = max(windowPeak, loudness)
+                    bandPeaks = zip(bandPeaks, bands).map { max($0, $1) }
                     windowBytes += pcm.count
                     if windowBytes >= 3200 {
                         meterTrace += String(min(9, Int(windowPeak * 10)))
+                        spectrumTrace.append(bandPeaks.map { String(min(9, Int($0 * 10))) }.joined())
                         windowPeak = 0
+                        bandPeaks = bandPeaks.map { _ in 0 }
                         windowBytes = 0
                     }
                 }
                 RunLoop.main.run(until: Date().addingTimeInterval(pace))
             }
             report["meterTrace"] = meterTrace
+            report["spectrumTrace"] = spectrumTrace.joined(separator: " ")
             report["meterNoiseFloorDb"] = (meter.floorDb * 10).rounded() / 10
             if let runtimeError { throw runtimeError }
 

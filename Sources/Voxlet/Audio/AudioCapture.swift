@@ -5,13 +5,14 @@ import AVFoundation
 final class AudioCapture {
     /// Called on the audio thread.
     var onPCM: ((Data) -> Void)?
-    /// Called on the main queue.
-    var onLevel: ((Float) -> Void)?
+    /// Voice bands for the overlay, 0...1 each. Called on the main queue.
+    var onSpectrum: (([Float]) -> Void)?
 
     private let engine = AVAudioEngine()
     private var converter: PCM16Converter?
-    /// Lives across recordings so the learned noise floor carries over. Touched only on the audio thread.
+    /// Both live across recordings so the learned noise floors carry over. Touched only on the audio thread.
     private var meter = AudioLevelMeter()
+    private let spectrum = SpectrumAnalyzer()
 
     var isRunning: Bool { engine.isRunning }
 
@@ -47,8 +48,8 @@ final class AudioCapture {
         input.installTap(onBus: 0, bufferSize: 1024, format: tapFormat) { [weak self] buffer, _ in
             guard let self, let pcm = self.converter?.convert(buffer) else { return }
             self.onPCM?(pcm)
-            let level = self.meter.level(for: pcm)
-            DispatchQueue.main.async { self.onLevel?(level) }
+            let bands = self.spectrum.analyze(pcm, gated: self.meter.level(for: pcm) == 0)
+            DispatchQueue.main.async { self.onSpectrum?(bands) }
         }
         engine.prepare()
         do {
