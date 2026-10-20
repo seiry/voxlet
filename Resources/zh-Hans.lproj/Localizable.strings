@@ -122,4 +122,4 @@
 "Usage" = "用量";
 "Using fn? Set System Settings → Keyboard → “Press 🌐 key to” to “Do Nothing”, or macOS will also open the emoji picker or dictation." = "使用 fn 时，请把 系统设置 → 键盘 →「按下 🌐 键时」设为「不执行任何操作」，否则 macOS 也会弹出表情或系统听写。";
 "Version %@" = "版本 %@";
-"Voxlet is signed ad hoc, so macOS may ask again after each rebuild. Remove the old entry in System Settings and grant it again if the switch looks on but the status stays off." = "Voxlet 使用临时签名，每次重新构建后 macOS 可能会再次要求授权。如果系统设置里开关是开的但这里仍显示未授权，删掉旧条目后重新授权。";
+"If the switch in System Settings looks on but the status here stays off, the grant belongs to an older signature: remove the Voxlet entry there and grant it again." = "如果系统设置里开关是开的但这里仍显示未授权，说明那条授权属于旧签名：删掉 Voxlet 条目后重新授权。";

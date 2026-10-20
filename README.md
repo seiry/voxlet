@@ -38,9 +38,20 @@ Settings → Model:
 
 Press **Test** to open a session; on failure it shows the server's close code and reason verbatim.
 
-The build is signed ad hoc (set `SIGN_IDENTITY` to use a real identity), so macOS treats every rebuild as a new
-app. If a permission looks enabled in System Settings but Voxlet says otherwise, remove the old entry there and
-grant it again.
+### Signing
+
+macOS keys privacy grants (Microphone, Accessibility) and Keychain access to the app's designated requirement.
+An ad hoc signature changes on every build, so every rebuild would need the permissions granted again. Run once:
+
+```sh
+./scripts/make-signing-cert.sh   # self-signed "Voxlet Local Signing" in its own keychain
+./scripts/install.sh             # build, sign with it, copy to /Applications
+```
+
+`build.sh` signs with that identity whenever it exists (or with `SIGN_IDENTITY`), giving the requirement
+`identifier "dev.seiry.voxlet" and certificate leaf = H"…"`, which stays the same across rebuilds. The
+certificate is self-signed and untrusted, which is fine for local use; it is not meant for distribution. The
+keychain lives at `~/Library/Keychains/voxlet-signing.keychain-db`, its password in `~/.config/voxlet-signing/`.
 
 Using `fn` as the shortcut: set System Settings → Keyboard → "Press 🌐 key to" to "Do Nothing", or macOS will
 open the emoji picker or system dictation as well.

@@ -291,7 +291,7 @@ struct PermissionsSettingsPage: View {
                     row(kind)
                 }
             }
-            Text(L10n.t("Voxlet is signed ad hoc, so macOS may ask again after each rebuild. Remove the old entry in System Settings and grant it again if the switch looks on but the status stays off."))
+            Text(L10n.t("If the switch in System Settings looks on but the status here stays off, the grant belongs to an older signature: remove the Voxlet entry there and grant it again."))
                 .font(.system(size: 11.5))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
