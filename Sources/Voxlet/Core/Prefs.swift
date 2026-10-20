@@ -15,6 +15,7 @@ enum Prefs {
     static let model = "model"
     static let endpointOverride = "endpointOverride"
     static let recognitionLanguage = "recognitionLanguage"
+    static let transcriptionStyle = "transcriptionStyle"
 
     static let hotkey = "hotkey"
     static let hotkeyBehavior = "hotkeyBehavior"
@@ -39,6 +40,7 @@ enum Prefs {
             provider: GeminiProvider.agentPlatform.rawValue,
             vertexLocation: GeminiLiveConfig.defaultLocation,
             model: GeminiLiveConfig.defaultModel,
+            transcriptionStyle: TranscriptionStyle.verbatimClean.rawValue,
             hotkeyBehavior: HotkeyBehavior.longPress.rawValue,
             interactionSounds: true,
             showRealtimeText: true,
@@ -69,8 +71,48 @@ enum Prefs {
             location: string(vertexLocation),
             endpointOverride: string(endpointOverride),
             languageCodes: RecognitionLanguage.codes(for: string(recognitionLanguage)),
-            vocabulary: VocabularyStore.shared.terms
+            vocabulary: VocabularyStore.shared.terms,
+            mode: TranscriptionStyle.current.geminiMode
         )
+    }
+}
+
+/// How Gemini shapes the transcript. SMART also resolves what it takes for self-corrections, which can drop whole
+/// clauses, so the default is VERBATIM with only standalone fillers removed locally.
+enum TranscriptionStyle: String, CaseIterable, Identifiable {
+    case verbatimClean
+    case smart
+    case verbatim
+
+    var id: String { rawValue }
+
+    static var current: TranscriptionStyle {
+        TranscriptionStyle(rawValue: Prefs.string(Prefs.transcriptionStyle)) ?? .verbatimClean
+    }
+
+    var geminiMode: String { self == .smart ? "SMART" : "VERBATIM" }
+
+    var displayName: String {
+        switch self {
+        case .verbatimClean: return L10n.t("Verbatim, Fillers Removed")
+        case .smart: return L10n.t("Smart Cleanup")
+        case .verbatim: return L10n.t("Fully Verbatim")
+        }
+    }
+
+    var caption: String {
+        switch self {
+        case .verbatimClean:
+            return L10n.t("Keeps every sentence and only drops standalone fillers such as 嗯, 呃, um and uh.")
+        case .smart:
+            return L10n.t("Gemini also resolves self-corrections and formats lists, which can drop whole clauses.")
+        case .verbatim:
+            return L10n.t("Exactly what was said, fillers and false starts included.")
+        }
+    }
+
+    func apply(to text: String) -> String {
+        self == .verbatimClean ? FillerFilter.clean(text) : text
     }
 }
 

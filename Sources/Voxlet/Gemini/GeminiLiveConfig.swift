@@ -30,6 +30,8 @@ struct GeminiLiveConfig {
     var endpointOverride: String
     var languageCodes: [String]
     var vocabulary: [String] = []
+    /// `VERBATIM` (Gemini's default) or `SMART`.
+    var mode = "VERBATIM"
 
     var endpoint: String {
         let custom = endpointOverride.trimmed
@@ -78,7 +80,7 @@ struct GeminiLiveConfig {
         // An empty language list asks Gemini to auto-detect, which also keeps code-mixing working.
         var transcription: [String: Any] = [
             "languageCodes": languageCodes,
-            "mode": "SMART",
+            "mode": mode,
         ]
         if !vocabulary.isEmpty {
             transcription["customVocabulary"] = Array(vocabulary.prefix(VocabularyStore.maxTermsSent))

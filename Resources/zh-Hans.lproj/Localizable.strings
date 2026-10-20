@@ -138,3 +138,10 @@
 "A term is one line of at most %d characters, with at least one letter or digit." = "一个词占一行，最多 %d 个字符，且至少包含一个字母、数字或汉字。";
 "Remove" = "删除";
 "Select a word and press the shortcut to add it to the vocabulary instead of dictating." = "选中一个词再按快捷键，会把它加入词库，而不是开始听写。";
+"Transcription Style" = "转写风格";
+"Verbatim, Fillers Removed" = "逐字，去口水词";
+"Smart Cleanup" = "智能整理";
+"Fully Verbatim" = "完全逐字";
+"Keeps every sentence and only drops standalone fillers such as 嗯, 呃, um and uh." = "保留每一句话，只去掉单独出现的“嗯、呃”和 um、uh 这类口水词。";
+"Gemini also resolves self-corrections and formats lists, which can drop whole clauses." = "Gemini 还会自动处理改口并整理成列表，有时会删掉整句。";
+"Exactly what was said, fillers and false starts included." = "说什么记什么，口水词和说到一半的改口都保留。";

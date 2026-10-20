@@ -8,6 +8,7 @@ struct GeneralSettingsPage: View {
     @AppStorage(Prefs.inputDeviceUID) private var inputDeviceUID = ""
     @AppStorage(Prefs.interactionSounds) private var interactionSounds = true
     @AppStorage(Prefs.recognitionLanguage) private var recognitionLanguage = RecognitionLanguage.auto.rawValue
+    @AppStorage(Prefs.transcriptionStyle) private var transcriptionStyle = TranscriptionStyle.verbatimClean.rawValue
     @AppStorage(Prefs.showRealtimeText) private var showRealtimeText = true
     @AppStorage(Prefs.keepResultInClipboard) private var keepResultInClipboard = false
     @AppStorage(Prefs.showInDock) private var showInDock = false
@@ -48,6 +49,19 @@ struct GeneralSettingsPage: View {
                     Picker("", selection: $recognitionLanguage) {
                         ForEach(RecognitionLanguage.allCases) { language in
                             Text(language.displayName).tag(language.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 200)
+                }
+                SettingsDivider()
+                SettingsRow(
+                    title: L10n.t("Transcription Style"),
+                    caption: (TranscriptionStyle(rawValue: transcriptionStyle) ?? .verbatimClean).caption
+                ) {
+                    Picker("", selection: $transcriptionStyle) {
+                        ForEach(TranscriptionStyle.allCases) { style in
+                            Text(style.displayName).tag(style.rawValue)
                         }
                     }
                     .labelsHidden()

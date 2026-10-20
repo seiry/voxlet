@@ -1,43 +1,97 @@
 import AppKit
 import ApplicationServices
 import Carbon.HIToolbox
+import OSLog
 
 /// Reads the frontmost app's selected text, adapted from Voxt's SelectedTextProbe (Apache-2.0).
-/// Order: focused element (system-wide, app, then a shallow window search), caret-only short-circuit,
-/// AXSelectedText, AXStringForRange, AXTextMarker (WebKit and Chromium), and finally a guarded ⌘C for apps
-/// whose accessibility tree is dead. Voxt's browser AppleScript path is left out; it needs Automation rights.
+/// Order: focused element, caret-only short-circuit (skipped for apps that misreport it), AXSelectedText,
+/// AXStringForRange, AXTextMarker, then a guarded ⌘C. Voxt's browser AppleScript path is left out: Firefox has no
+/// JavaScript bridge, and Chrome and Safari need Automation rights plus a developer menu switch.
 enum SelectionReader {
     private static let focusTimeout: Float = 0.2
     private static let fallbackTimeout: Float = 0.05
     private static let copyWait: TimeInterval = 0.15
 
+    private static let log = Logger(subsystem: "dev.seiry.voxlet", category: "selection")
+
     static func selectedText() -> String? {
-        guard AXIsProcessTrusted(), let app = NSWorkspace.shared.frontmostApplication else { return nil }
+        guard AXIsProcessTrusted(), let app = NSWorkspace.shared.frontmostApplication else {
+            log.notice("probe skipped: accessibility not trusted or no frontmost app")
+            return nil
+        }
         let bundleID = app.bundleIdentifier
+        let appID = bundleID ?? "unknown"
         // Obsidian reports stale selections, so Voxt skips it entirely.
         guard bundleID != "md.obsidian" else { return nil }
 
         let (focused, windowCount) = resolveFocus(processID: app.processIdentifier)
         let range = focused.flatMap { selectedRange(of: $0) }
-        if let range, range.length == 0 { return nil }
+        let role = focused.flatMap { stringAttribute(kAXRoleAttribute, of: $0) } ?? "nil"
+        log.notice("probe app=\(appID, privacy: .public) focused=\(focused != nil) role=\(role, privacy: .public) range=\(range.map { "\($0.location),\($0.length)" } ?? "nil", privacy: .public) windows=\(windowCount)")
+        let unreliable = axSelectionUnreliable(bundleID: bundleID)
+        // Terminals, browsers and code editors report a caret-only range even with text selected, so only
+        // trust that answer elsewhere.
+        if let range, range.length == 0, !unreliable {
+            log.notice("result: caret only")
+            return nil
+        }
 
         if let focused {
-            if let text = stringAttribute(kAXSelectedTextAttribute, of: focused) { return text }
-            if let range, let text = string(for: range, of: focused) { return text }
-            if let text = textMarkerSelection(startingAt: focused) { return text }
+            if let text = stringAttribute(kAXSelectedTextAttribute, of: focused) {
+                log.notice("result: AXSelectedText chars=\(text.count)")
+                return text
+            }
+            if let range, let text = string(for: range, of: focused) {
+                log.notice("result: AXStringForRange chars=\(text.count)")
+                return text
+            }
+            if let text = textMarkerSelection(startingAt: focused) {
+                log.notice("result: text marker chars=\(text.count)")
+                return text
+            }
         }
 
         let copiesLine = copiesCurrentLineWhenSelectionEmpty(bundleID: bundleID)
-        // With a focused element, ⌘C is only safe when AX confirmed a non-empty range. Without one, it is safe
-        // unless the app copies the current line on an empty selection.
-        let allowCopy = focused != nil ? (range?.length ?? 0) > 0 : !copiesLine
-        if allowCopy, let text = simulatedCopy()?.trimmed, !text.isEmpty { return text }
-
-        // Line-copy editors with a total AX blackout: accept the clipboard only if it does not look like a line copy.
-        if copiesLine, focused == nil, windowCount == 0, let raw = simulatedCopy(), !looksLikeLineCopy(raw) {
-            return raw.trimmed
+        // ⌘C is safe where AX confirmed a non-empty range, where AX is dead, and in apps whose AX answer cannot
+        // be trusted. Editors that copy the whole line on an empty selection get their line copies filtered out.
+        let allowCopy: Bool
+        if unreliable || focused == nil {
+            allowCopy = true
+        } else {
+            allowCopy = (range?.length ?? 0) > 0
         }
+        if allowCopy, let raw = simulatedCopy() {
+            if copiesLine, looksLikeLineCopy(raw) {
+                log.notice("result: rejected line copy")
+                return nil
+            }
+            let text = raw.trimmed
+            if !text.isEmpty {
+                log.notice("result: simulated copy chars=\(text.count)")
+                return text
+            }
+        }
+        log.notice("result: nothing (allowCopy=\(allowCopy) copiesLine=\(copiesLine))")
         return nil
+    }
+
+    /// Apps whose AX selection is missing or always reports a caret: terminals (their selection is not a text
+    /// selection), browsers (web content is often not exposed), and editors in copiesCurrentLineWhenSelectionEmpty.
+    private static func axSelectionUnreliable(bundleID: String?) -> Bool {
+        guard let bundleID else { return false }
+        if copiesCurrentLineWhenSelectionEmpty(bundleID: bundleID) { return true }
+        let terminals: Set<String> = [
+            "com.mitchellh.ghostty", "com.googlecode.iterm2", "com.apple.Terminal", "dev.warp.Warp-Stable",
+            "dev.warp.Warp", "io.alacritty", "org.alacritty", "net.kovidgoyal.kitty", "com.github.wez.wezterm",
+            "co.zeit.hyper", "com.raphaelamorim.rio",
+        ]
+        let browsers: Set<String> = [
+            "org.mozilla.firefox", "org.mozilla.firefoxdeveloperedition", "org.mozilla.nightly", "app.zen-browser.zen",
+            "com.google.Chrome", "com.google.Chrome.canary", "com.google.Chrome.beta", "com.google.Chrome.dev",
+            "org.chromium.Chromium", "company.thebrowser.Browser", "com.microsoft.edgemac", "com.brave.Browser",
+            "com.vivaldi.Vivaldi", "com.operasoftware.Opera", "com.apple.Safari", "com.apple.SafariTechnologyPreview",
+        ]
+        return terminals.contains(bundleID) || browsers.contains(bundleID)
     }
 
     // MARK: - Focus
@@ -122,10 +176,12 @@ enum SelectionReader {
         return nil
     }
 
-    /// Posts ⌘C, waits briefly for the pasteboard to change, then restores the previous clipboard text.
+    /// Posts ⌘C, waits briefly for the pasteboard to change, then puts every previous item back, not just text.
     private static func simulatedCopy() -> String? {
         let pasteboard = NSPasteboard.general
-        let previous = pasteboard.string(forType: .string)
+        let snapshot = (pasteboard.pasteboardItems ?? []).map { item in
+            item.types.compactMap { type in item.data(forType: type).map { (type, $0) } }
+        }
         let changeCount = pasteboard.changeCount
         let source = CGEventSource(stateID: .hidSystemState)
         for keyDown in [true, false] {
@@ -142,7 +198,12 @@ enum SelectionReader {
         guard pasteboard.changeCount != changeCount else { return nil }
         let copied = pasteboard.string(forType: .string)
         pasteboard.clearContents()
-        if let previous, !previous.isEmpty { pasteboard.setString(previous, forType: .string) }
+        let restored = snapshot.map { entries -> NSPasteboardItem in
+            let item = NSPasteboardItem()
+            for (type, data) in entries { item.setData(data, forType: type) }
+            return item
+        }
+        if !restored.isEmpty { pasteboard.writeObjects(restored) }
         return copied
     }
 

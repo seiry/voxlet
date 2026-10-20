@@ -12,6 +12,7 @@ enum SelfTest {
         let audioPath = arguments[index + 1]
         let outPath = arguments.firstIndex(of: "--out").flatMap { arguments.count > $0 + 1 ? arguments[$0 + 1] : nil }
         let env = ProcessInfo.processInfo.environment
+        let style = TranscriptionStyle(rawValue: env["VOXLET_STYLE"] ?? "") ?? .current
 
         let config = GeminiLiveConfig(
             provider: GeminiProvider(rawValue: env["VOXLET_PROVIDER"] ?? "") ?? .agentPlatform,
@@ -23,7 +24,8 @@ enum SelfTest {
             languageCodes: RecognitionLanguage.codes(for: env["VOXLET_LANGUAGES"] ?? ""),
             // VOXLET_VOCABULARY (comma separated, may be empty) overrides the vocabulary file for repeatable runs.
             vocabulary: env["VOXLET_VOCABULARY"].map { $0.split(separator: ",").map { String($0).trimmed }.filter { !$0.isEmpty } }
-                ?? VocabularyStore.shared.terms
+                ?? VocabularyStore.shared.terms,
+            mode: style.geminiMode
         )
 
         var report: [String: Any] = [
@@ -100,7 +102,9 @@ enum SelfTest {
 
             switch outcome! {
             case .success(let result):
-                report["transcript"] = result.text
+                report["transcriptRaw"] = result.text
+                report["transcript"] = style.apply(to: result.text)
+                report["style"] = style.rawValue
                 report["finishReason"] = result.finishReason
                 report["finishLatencyMs"] = Int(Date().timeIntervalSince(finishStarted) * 1000)
                 report["audioSeconds"] = (result.audioSeconds * 100).rounded() / 100

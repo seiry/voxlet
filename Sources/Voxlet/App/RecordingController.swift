@@ -114,12 +114,13 @@ final class RecordingController: ObservableObject {
                 usage: output.usage,
                 characters: output.text.count
             ))
-            guard !output.text.isEmpty else {
+            let text = TranscriptionStyle.current.apply(to: output.text)
+            guard !text.isEmpty else {
                 overlay.showStatus(L10n.t("No speech recognized."))
                 return
             }
             overlay.hide()
-            if TextInserter.insert(output.text, target: targetApp) == .copiedOnly {
+            if TextInserter.insert(text, target: targetApp) == .copiedOnly {
                 overlay.showStatus(L10n.t("Copied to clipboard. Grant Accessibility to paste automatically."), hideAfter: Self.errorStatusDuration)
             }
         case .failure(let error):
