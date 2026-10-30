@@ -381,3 +381,21 @@ enum MeetingTitle {
 extension String {
     var nilIfEmpty: String? { isEmpty ? nil : self }
 }
+
+extension MeetingController {
+    /// Sample state for `--render-previews`.
+    func loadPreview(state: State, lines: [MeetingLine], interim: (MeetingSide, String)?, notes: MeetingNotes, elapsed: TimeInterval,
+                     questions: [(String, String?)] = []) {
+        self.state = state
+        self.lines = lines
+        self.interimSide = interim?.0 ?? .them
+        self.interim = interim?.1 ?? ""
+        self.notes = notes
+        self.notesUpdatedAt = notes.isEmpty ? nil : elapsed - 40
+        self.notesVersion = notes.isEmpty ? 0 : 2
+        self.elapsed = elapsed
+        self.voiceProcessing = true
+        self.browserHeard = true
+        self.questions = questions.map { QA(question: $0.0, answer: $0.1) }
+    }
+}

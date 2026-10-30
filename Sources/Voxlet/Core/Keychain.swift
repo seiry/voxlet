@@ -18,7 +18,12 @@ enum Keychain {
     }
 
     /// The new-api gateway key for meeting notes, kept apart from the Gemini key.
-    static var gatewayKey: String? { read(gatewayAccount) }
+    static var gatewayKey: String? {
+        if let override = ProcessInfo.processInfo.environment["VOXLET_GATEWAY_KEY"], !override.isEmpty {
+            return override
+        }
+        return read(gatewayAccount)
+    }
 
     @discardableResult
     static func setAPIKey(_ value: String) -> Bool { write(value, account: geminiAccount) }

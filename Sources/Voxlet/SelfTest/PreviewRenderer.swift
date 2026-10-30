@@ -55,6 +55,10 @@ enum PreviewRenderer {
             )
         }
 
+        MeetingPreviews.render(into: directory) { view, size, appearance, background, url in
+            render(view, size: size, appearance: appearance, background: background, to: url)
+        }
+
         let controller = SettingsWindowController()
         controller.show(tab: .general)
         RunLoop.main.run(until: Date().addingTimeInterval(1))

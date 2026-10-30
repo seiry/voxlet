@@ -5,6 +5,7 @@ import SwiftUI
 enum SettingsTab: String, CaseIterable, Identifiable {
     case general
     case model
+    case meeting
     case permissions
     case hotkey
     case vocabulary
@@ -17,6 +18,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general: return L10n.t("General")
         case .model: return L10n.t("Model")
+        case .meeting: return L10n.t("Meeting")
         case .permissions: return L10n.t("Permissions")
         case .hotkey: return L10n.t("Hotkey")
         case .vocabulary: return L10n.t("Vocabulary")
@@ -29,6 +31,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general: return "slider.horizontal.3"
         case .model: return "cpu"
+        case .meeting: return "person.2.wave.2"
         case .permissions: return "lock.shield"
         case .hotkey: return "keyboard"
         case .vocabulary: return "text.book.closed"
@@ -127,6 +130,7 @@ struct SettingsRootView: View {
         switch navigation.tab {
         case .general: GeneralSettingsPage()
         case .model: ModelSettingsPage()
+        case .meeting: MeetingSettingsPage()
         case .permissions: PermissionsSettingsPage()
         case .hotkey: HotkeySettingsPage()
         case .vocabulary: VocabularySettingsPage()

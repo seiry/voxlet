@@ -3,12 +3,16 @@ import Combine
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     let recorder = RecordingController()
+    let meeting = MeetingController()
+    private lazy var meetingPanel = MeetingPanelController(meeting: meeting)
+    private let meetingDetail = MeetingDetailWindowController()
     private var statusItem: NSStatusItem?
     private let settingsWindow = SettingsWindowController()
     private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setUpStatusItem()
+        setUpMeeting()
 
         let hotkeys = HotkeyManager.shared
         hotkeys.onStart = { [weak self] in self?.recorder.start() }
@@ -70,10 +74,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         updateStatusIcon(.idle)
     }
 
+    private func setUpMeeting() {
+        meeting.onError = { [weak self] message in
+            self?.recorder.overlay.showStatus(message, hideAfter: 5)
+        }
+        meeting.onFinished = { [weak self] folder, record in
+            guard let self else { return }
+            let screen = self.meetingPanel.screen
+            self.meetingPanel.hide()
+            self.meetingDetail.show(record: record, folder: folder, on: screen)
+        }
+        meeting.$state
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                if self.meeting.isActive { self.meetingPanel.show() }
+                self.updateStatusIcon(self.recorder.state)
+            }
+            .store(in: &cancellables)
+    }
+
     private func updateStatusIcon(_ state: RecordingController.State) {
         let symbol: String
         switch state {
-        case .idle: symbol = "waveform"
+        case .idle: symbol = meeting.isActive ? "record.circle" : "waveform"
         case .recording: symbol = "waveform.badge.mic"
         case .finishing: symbol = "ellipsis.circle"
         }
@@ -99,6 +123,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         let toggleTitle = recorder.isRecording ? L10n.t("Stop Dictation") : L10n.t("Start Dictation")
         menu.addItem(withTitle: toggleTitle, action: #selector(toggleDictation), keyEquivalent: "").target = self
+        menu.addItem(.separator())
+        switch meeting.state {
+        case .idle:
+            menu.addItem(withTitle: L10n.t("Start Meeting Notes"), action: #selector(startMeeting), keyEquivalent: "").target = self
+        case .recording, .paused:
+            menu.addItem(withTitle: L10n.t("End Meeting Notes"), action: #selector(endMeeting), keyEquivalent: "").target = self
+            menu.addItem(withTitle: L10n.t("Show Meeting Panel"), action: #selector(showMeetingPanel), keyEquivalent: "").target = self
+        case .finishing:
+            let item = NSMenuItem(title: L10n.t("Wrapping up the meeting…"), action: nil, keyEquivalent: "")
+            item.isEnabled = false
+            menu.addItem(item)
+        }
+        menu.addItem(withTitle: L10n.t("Open Meetings Folder"), action: #selector(openMeetingsFolder), keyEquivalent: "").target = self
+        menu.addItem(.separator())
         menu.addItem(withTitle: L10n.t("Settings…"), action: #selector(openSettings), keyEquivalent: ",").target = self
         menu.addItem(microphoneMenuItem())
         menu.addItem(.separator())
@@ -143,6 +181,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func openSettings() {
         settingsWindow.show()
+    }
+
+    @objc private func startMeeting() {
+        if !MeetingGateway.current.isConfigured {
+            recorder.overlay.showStatus(L10n.t("No notes key yet: recording without running notes. Add it in Settings → Meeting."), hideAfter: 5)
+        }
+        meeting.start()
+    }
+
+    @objc private func endMeeting() {
+        meeting.end()
+    }
+
+    @objc private func showMeetingPanel() {
+        meetingPanel.show()
+    }
+
+    @objc private func openMeetingsFolder() {
+        let root = MeetingStore.root
+        try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(root)
     }
 
     @objc private func selectMicrophone(_ sender: NSMenuItem) {
