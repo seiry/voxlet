@@ -20,7 +20,26 @@ dictionary, no LLM rewrite, no meeting mode). Gemini's `SMART` transcription mod
   (at most 5 words and 10 CJK characters in a row; a longer selection is dictated over).
 - **Usage and cost**: token counts from the server's `usageMetadata` for each dictation, totals for today,
   this month and all time, with editable prices.
+- **Meeting notes** (macOS 26+): start from the menu bar during a call. Voxlet records your microphone and what the
+  browser plays, transcribes both live as "me" and "them" in a floating panel that stays out of screen sharing
+  and remembers which display it was on, keeps running notes, and answers questions about the meeting so far.
+  Afterwards both tracks are transcribed again offline with speakers told apart, and the meeting lands in
+  `~/Meetings/<date time title>/` as `notes.md`, `transcript.md`, `meeting.json` and `audio/`.
 - English and Simplified Chinese UI.
+
+## Meeting mode
+
+- **No headphones needed.** On speakers the microphone runs Apple's voice processing, which on a MacBook removes
+  everything the speakers play, from any app, and keeps your voice. While it runs other apps play about 6 dB
+  quieter. With headphones it stays off. Measurements are in `probe/meeting-aec/REPORT.md`.
+- **One Live stream, turns cut locally.** Both sides are mixed into one Gemini Live session with automatic
+  activity detection off; Voxlet opens and closes each turn when the speaking side changes, so every final has a
+  side. A session is replaced in a quiet gap before its 10-minute limit.
+- **Offline pass.** `gemini-3.5-transcribe` on Agent Platform, the microphone track as you and the browser track
+  with diarization, then the notes model names the speakers and writes the notes.
+- **Notes model.** Any Gemini-compatible `generateContent` endpoint (Settings → Meeting), for example a new-api
+  gateway with `gemini-3.8-flash`. It only ever sees text.
+- **Permissions.** Microphone, plus System Audio Recording, which macOS asks for the first time a meeting starts.
 
 ## Build and run
 
@@ -88,6 +107,18 @@ page and overlay state to PNG. Output lands in `dist/e2e/`.
 
 Two developer modes back it: `Voxlet --selftest <audio> [--out result.json]` (configured through `VOXLET_*`
 environment variables) and `Voxlet --render-previews <dir>`.
+
+```sh
+VOXLET_API_KEY=… VOXLET_PROJECT=… VOXLET_GATEWAY_KEY=… ./scripts/meeting-e2e.sh
+VOXLET_API_KEY=… VOXLET_PROJECT=… VOXLET_GATEWAY_KEY=… ./scripts/meeting-device-check.sh
+```
+
+`meeting-e2e.sh` runs a 68 s, three-voice, Chinese and English meeting (two of the five local sentences spoken
+over the other side) from two files through the whole meeting pipeline, with the Live session forced to roll
+over every 25 s, and checks coverage, me/them labels, rollover, running notes, offline speakers, the to-do owner
+and the files. `meeting-device-check.sh` does the same on real devices: QuickTime Player plays the other side
+out of the Mac speakers, a second speaker (`HDMI_DEVICE`) plays you, and the packaged app records with voice
+processing and the browser tap. `scripts/tap-check.sh` checks the tap alone.
 
 ## License
 

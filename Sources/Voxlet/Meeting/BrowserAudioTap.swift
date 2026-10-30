@@ -20,7 +20,6 @@ final class BrowserAudioTap {
     private var tapID = AudioObjectID(kAudioObjectUnknown)
     private var aggregateID = AudioObjectID(kAudioObjectUnknown)
     private var procID: AudioDeviceIOProcID?
-    private var channels = 1
 
     func start(_ target: Target) throws {
         stop()
@@ -65,7 +64,7 @@ final class BrowserAudioTap {
             aggregateID = device
             let format = try Self.tapFormat(tap)
             sampleRate = format.mSampleRate
-            channels = max(1, Int(format.mChannelsPerFrame))
+            formatDescription = "\(format.mSampleRate) Hz, \(format.mChannelsPerFrame) ch, \(format.mBytesPerFrame) B/frame, flags \(format.mFormatFlags)"
 
             var proc: AudioDeviceIOProcID?
             try check(AudioDeviceCreateIOProcIDWithBlock(&proc, device, queue) { [weak self] _, input, _, _, _ in
@@ -93,18 +92,27 @@ final class BrowserAudioTap {
         tapID = kAudioObjectUnknown
     }
 
+    /// What the IO proc actually delivered on its first call, for the self-test report.
+    private(set) var firstDelivery: String?
+    private(set) var formatDescription = ""
+
     private func deliver(_ input: UnsafePointer<AudioBufferList>) {
         let buffers = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: input))
-        guard let first = buffers.first, let data = first.mData else { return }
+        if firstDelivery == nil {
+            firstDelivery = buffers.map { "\($0.mNumberChannels)ch \($0.mDataByteSize)B" }.joined(separator: ", ")
+        }
+        // Taps come after the sub-device's own input streams. While voice processing runs in this process the
+        // speakers expose a 6-channel input first, and reading that as the tap made the track six times too long.
+        guard let tapBuffer = buffers.last, let data = tapBuffer.mData else { return }
         let samples = data.assumingMemoryBound(to: Float.self)
-        let count = Int(first.mDataByteSize) / MemoryLayout<Float>.size
-        if channels == 1 || buffers.count > 1 {
+        let count = Int(tapBuffer.mDataByteSize) / MemoryLayout<Float>.size
+        let stride = max(1, Int(tapBuffer.mNumberChannels))
+        if stride == 1 {
             onSamples?(UnsafeBufferPointer(start: samples, count: count))
         } else {
-            // An interleaved multichannel tap: keep the first channel.
-            let frames = count / channels
+            let frames = count / stride
             var mono = [Float](repeating: 0, count: frames)
-            for i in 0..<frames { mono[i] = samples[i * channels] }
+            for i in 0..<frames { mono[i] = samples[i * stride] }
             mono.withUnsafeBufferPointer { onSamples?($0) }
         }
     }

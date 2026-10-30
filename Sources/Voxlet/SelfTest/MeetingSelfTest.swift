@@ -8,10 +8,15 @@ enum MeetingSelfTest {
         func value(_ name: String) -> String? {
             arguments.firstIndex(of: name).flatMap { arguments.count > $0 + 1 ? arguments[$0 + 1] : nil }
         }
-        guard let micPath = value("--mic"), let browserPath = value("--browser"), let reportPath = value("--report") else {
-            FileHandle.standardError.write(Data("usage: Voxlet --meeting-selftest --mic f --browser f --report out.json\n".utf8))
+        guard let reportPath = value("--report") else {
+            FileHandle.standardError.write(Data("usage: Voxlet --meeting-selftest (--mic f --browser f | --devices --browser-bundle id --seconds n) --report out.json\n".utf8))
             return 2
         }
+        if arguments.contains("--devices") {
+            return runOnDevices(bundle: value("--browser-bundle") ?? "com.apple.QuickTimePlayerX",
+                                seconds: Double(value("--seconds") ?? "75") ?? 75, reportPath: reportPath)
+        }
+        guard let micPath = value("--mic"), let browserPath = value("--browser") else { return 2 }
         let rollover = value("--rollover").flatMap(Double.init)
         var report: [String: Any] = ["startedAt": ISO8601DateFormatter().string(from: Date())]
         let controller = MeetingController()
@@ -59,6 +64,50 @@ enum MeetingSelfTest {
         report["finishedAt"] = ISO8601DateFormatter().string(from: Date())
         report["notesVersionsDuringMeeting"] = notesVersions
         report["notesDuringMeeting"] = notesDuringMeeting.map(encodable) ?? [:]
+        report["timedOut"] = !done
+        let data = (try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])) ?? Data()
+        try? data.write(to: URL(fileURLWithPath: reportPath))
+        return report["error"] == nil && done ? 0 : 1
+    }
+
+    /// The real microphone (echo cancellation on speakers) and a tap of `bundle`, for `seconds`. Launch through
+    /// `open -n` so the microphone and System Audio Recording grants are the app's.
+    private static func runOnDevices(bundle: String, seconds: Double, reportPath: String) -> Int32 {
+        var report: [String: Any] = ["startedAt": ISO8601DateFormatter().string(from: Date()), "browserBundle": bundle]
+        let controller = MeetingController()
+        var done = false
+        controller.onFinished = { folder, record in
+            report["folder"] = folder.path
+            report["record"] = encodable(record)
+            done = true
+        }
+        controller.onError = { message in
+            report["error"] = message
+            done = true
+        }
+        if #available(macOS 26.0, *) {
+            let voiceProcessing = !OutputRoute.isHeadphones
+            report["voiceProcessing"] = voiceProcessing
+            do {
+                try controller.start(mic: MicrophoneSource(voiceProcessing: voiceProcessing), browser: BrowserSource(bundleIDs: [bundle]),
+                                     title: "设备会议", voiceProcessing: voiceProcessing, rolloverAfter: 25)
+                DispatchQueue.main.asyncAfter(deadline: .now() + seconds) {
+                    report["notesVersionsDuringMeeting"] = controller.notesVersion
+                    report["browserHeardAtEnd"] = controller.browserHeard
+                    controller.end()
+                }
+            } catch {
+                report["error"] = error.localizedDescription
+                done = true
+            }
+        } else {
+            report["error"] = "needs macOS 26"
+            done = true
+        }
+        let deadline = Date().addingTimeInterval(seconds + 600)
+        while !done, Date() < deadline {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        }
         report["timedOut"] = !done
         let data = (try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])) ?? Data()
         try? data.write(to: URL(fileURLWithPath: reportPath))

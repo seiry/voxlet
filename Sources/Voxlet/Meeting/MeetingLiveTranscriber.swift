@@ -168,7 +168,7 @@ struct TurnSegmenter {
     }
 
     static let activeDBFS: Float = -45
-    static let prerollChunks = 3
+    static let prerollChunks = 6
     /// 600 ms of silence ends a turn; long monologues are cut so text keeps arriving.
     private static let endQuietChunks = 6
     private static let maxTurnChunks = 300
@@ -184,11 +184,22 @@ struct TurnSegmenter {
         length = 0
     }
 
+    /// Opening a turn needs more than keeping one going. The processed microphone still spikes past -45 dBFS in
+    /// about 5% of 100 ms chunks while only the other side talks (runs of up to 4); each false turn gets no final
+    /// and shifts every later final onto the wrong turn. The tap is a clean digital signal.
+    private static let beginDBFS: [MeetingSide: Float] = [.me: -40, .them: -45]
+    private static let beginChunks: [MeetingSide: Int] = [.me: 4, .them: 2]
+    private var beginRun: [MeetingSide: Int] = [.me: 0, .them: 0]
+
+    private func ready(_ side: MeetingSide) -> Bool { beginRun[side]! >= Self.beginChunks[side]! }
+
     mutating func feed(me: Float, them: Float, at time: TimeInterval) -> [Event] {
         run[.me] = me > Self.activeDBFS ? run[.me]! + 1 : 0
         run[.them] = them > Self.activeDBFS ? run[.them]! + 1 : 0
+        beginRun[.me] = me > Self.beginDBFS[.me]! ? beginRun[.me]! + 1 : 0
+        beginRun[.them] = them > Self.beginDBFS[.them]! ? beginRun[.them]! + 1 : 0
         guard let current = side else {
-            let loud = [MeetingSide.me, .them].filter { run[$0]! >= 2 }
+            let loud = [MeetingSide.me, .them].filter(ready)
             guard !loud.isEmpty else { return [] }
             let next = loud.count == 2 ? (me >= them ? MeetingSide.me : .them) : loud[0]
             restart(next)
@@ -197,7 +208,7 @@ struct TurnSegmenter {
         let other: MeetingSide = current == .me ? .them : .me
         quiet = run[current]! == 0 ? quiet + 1 : 0
         length += 1
-        if quiet >= 2, run[other]! >= 3 {
+        if quiet >= 2, ready(other) {
             restart(other)
             return [.end, .begin(other)]
         }

@@ -79,7 +79,9 @@ checks = {
     f"offline transcript has me and >= 2 other speakers ({sorted(others)})": any(s["speaker"] == "me" for s in segments) and len(others) >= 2,
     "notes.md has a to-do with an owner": bool(re.search(r"^- \[ \] .+ @\S+", notes_md, re.M)),
     "all five files written": all(os.path.exists(os.path.join(folder, f)) for f in files),
-    f"both tracks as long as the meeting, {length:.0f} s (mic {mic_s:.1f}, browser {browser_s:.1f})": abs(mic_s - length) < 3 and abs(browser_s - length) < 3,
+    # The device run starts recording a few seconds before playback and stops a few after it.
+    f"both tracks cover the meeting, {length:.0f} s (mic {mic_s:.1f}, browser {browser_s:.1f})":
+        all(length - 2 <= s <= length + 6 for s in (mic_s, browser_s)),
 }
 for name, ok in checks.items():
     print(("PASS " if ok else "FAIL ") + name)

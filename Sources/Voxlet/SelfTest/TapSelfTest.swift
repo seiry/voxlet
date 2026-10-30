@@ -39,13 +39,26 @@ enum TapSelfTest {
                 }
                 lock.unlock()
             }
+            // --vpio runs the meeting microphone with voice processing in this same process, as a meeting does.
+            let mic = MeetingMicrophone()
+            var micFrames = 0
+            mic.onSamples = { buffer in
+                lock.lock()
+                micFrames += buffer.count
+                lock.unlock()
+            }
             do {
+                if arguments.contains("--vpio") { try mic.start(voiceProcessing: true) }
                 try tap.start(target)
                 RunLoop.main.run(until: Date().addingTimeInterval(seconds))
                 tap.stop()
+                mic.stop()
+                report["micSeconds"] = Double(micFrames) / MeetingMicrophone.sampleRate
                 lock.lock()
                 let rms = frames > 0 ? sqrt(sumSquares / Double(frames)) : 0
                 report["sampleRate"] = tap.sampleRate
+                report["tapFormat"] = tap.formatDescription
+                report["firstDelivery"] = tap.firstDelivery ?? "none"
                 report["callbacks"] = callbacks
                 report["seconds"] = Double(frames) / tap.sampleRate
                 report["peak"] = Double(peak)

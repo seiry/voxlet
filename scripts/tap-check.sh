@@ -15,6 +15,6 @@ if [[ $mode == pid ]]; then
   open -n -W "$root/dist/Voxlet.app" --args --tap-selftest --pid "$player" --seconds 6 --out "$report"
   kill $player 2>/dev/null || true
 else
-  open -n -W "$root/dist/Voxlet.app" --args --tap-selftest --bundle "${2:?bundle id}" --seconds "${3:-8}" --out "$report"
+  open -n -W "$root/dist/Voxlet.app" --args --tap-selftest --bundle "${2:?bundle id}" --seconds "${3:-8}" --out "$report" ${TAP_EXTRA:-}
 fi
 cat "$report"
