@@ -1,0 +1,13 @@
+[project]
+name = "meeting-aec-probe"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "google-genai",
+    "numpy",
+    "soundfile",
+    "rapidfuzz",
+    "requests",
+    "websockets>=17.3",
+    "zhconv>=1.4.3",
+]
