@@ -30,6 +30,15 @@ SCRIPT = [
 GAP = 0.8
 LEAD = 0.5
 
+# --quality: natural voices for the app's end-to-end test. The default voices above mangle English and the live
+# model hears little of them; the probe report used them, so they stay the default.
+QUALITY_VOICES = {"R": "Meijia", "S": "Samantha (英语（美国）)", "me": "Tingting"}
+QUALITY_S = [
+    "Last week we shipped version 0.3. It mostly fixed the hotkey issues, and the crash rate is now below one percent.",
+    "At the ninth minute we open a new WebSocket connection, overlap the two for two seconds, then remove duplicates.",
+    "Sure, but first we need to check whether it lowers the other side's volume. Let's decide before Friday.",
+]
+
 
 def tts(voice: str, text: str, work: pathlib.Path, i: int) -> np.ndarray:
     aiff = work / f"seg{i:02d}.aiff"
@@ -41,15 +50,20 @@ def tts(voice: str, text: str, work: pathlib.Path, i: int) -> np.ndarray:
     return x
 
 
-def main(out: pathlib.Path) -> None:
+def main(out: pathlib.Path, quality: bool = False) -> None:
     out.mkdir(parents=True, exist_ok=True)
     tmp = out / "segs"
     tmp.mkdir(exist_ok=True)
-    audio = [tts(VOICES[spk], text, tmp, i) for i, (spk, text, _) in enumerate(SCRIPT)]
+    voices, script = VOICES, SCRIPT
+    if quality:
+        english = iter(QUALITY_S)
+        voices = QUALITY_VOICES
+        script = [(spk, next(english) if spk == "S" else text, place) for spk, text, place in SCRIPT]
+    audio = [tts(voices[spk], text, tmp, i) for i, (spk, text, _) in enumerate(script)]
     segs = []
     cursor = LEAD
     prev_remote = None
-    for (spk, text, place), x in zip(SCRIPT, audio):
+    for (spk, text, place), x in zip(script, audio):
         dur = len(x) / RATE
         if spk == "me" and place == "overlap":
             start = prev_remote["start"] + 1.0
@@ -75,4 +89,4 @@ def main(out: pathlib.Path) -> None:
 
 
 if __name__ == "__main__":
-    main(pathlib.Path(sys.argv[1]))
+    main(pathlib.Path(sys.argv[1]), quality="--quality" in sys.argv)

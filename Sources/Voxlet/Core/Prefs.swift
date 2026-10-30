@@ -35,6 +35,25 @@ enum Prefs {
     static let priceAudioInputPerMillion = "priceAudioInputPerMillion"
     static let priceTextOutputPerMillion = "priceTextOutputPerMillion"
 
+    static let meetingFolder = "meetingFolder"
+    static let meetingGatewayURL = "meetingGatewayURL"
+    static let meetingNotesModel = "meetingNotesModel"
+    static let meetingBrowsers = "meetingBrowsers"
+    /// "auto" (on unless headphones), "on" or "off".
+    static let meetingEchoCancellation = "meetingEchoCancellation"
+    static let meetingPanelFrame = "meetingPanelFrame"
+    static let meetingPanelCollapsed = "meetingPanelCollapsed"
+    static let meetingPanelTab = "meetingPanelTab"
+
+    static let defaultMeetingBrowsers = [
+        "org.mozilla.firefoxdeveloperedition", "org.mozilla.firefox", "com.google.Chrome", "company.thebrowser.Browser",
+        "com.microsoft.edgemac",
+    ].joined(separator: "\n")
+
+    static var meetingBrowserBundleIDs: [String] {
+        string(meetingBrowsers).split(whereSeparator: { $0 == "\n" || $0 == "," }).map { String($0).trimmed }.filter { !$0.isEmpty }
+    }
+
     static func registerDefaults() {
         UserDefaults.standard.register(defaults: [
             provider: GeminiProvider.agentPlatform.rawValue,
@@ -53,6 +72,12 @@ enum Prefs {
             overlayPosition: OverlayPosition.bottom.rawValue,
             priceAudioInputPerMillion: Pricing.defaultAudioInputPerMillion,
             priceTextOutputPerMillion: Pricing.defaultTextOutputPerMillion,
+            meetingFolder: "~/Meetings",
+            meetingGatewayURL: "https://ai.sgp1.seiry.eu",
+            meetingNotesModel: "gemini-3.8-flash",
+            meetingBrowsers: defaultMeetingBrowsers,
+            meetingEchoCancellation: "auto",
+            meetingPanelTab: "live",
         ])
     }
 
