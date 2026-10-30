@@ -34,7 +34,8 @@ dictionary, no LLM rewrite, no meeting mode). Gemini's `SMART` transcription mod
   quieter. With headphones it stays off. Measurements are in `probe/meeting-aec/REPORT.md`.
 - **One Live stream, turns cut locally.** Both sides are mixed into one Gemini Live session with automatic
   activity detection off; Voxlet opens and closes each turn when the speaking side changes, so every final has a
-  side. A session is replaced in a quiet gap before its 10-minute limit.
+  side. Turns go out one at a time (the next waits for the last one's `generationComplete`), since Gemini merges
+  turns that overlap on its side. A session is replaced in a quiet gap before its 10-minute limit.
 - **Offline pass.** `gemini-3.5-transcribe` on Agent Platform, the microphone track as you and the browser track
   with diarization, then the notes model names the speakers and writes the notes.
 - **Notes model.** Any Gemini-compatible `generateContent` endpoint (Settings → Meeting), for example a new-api

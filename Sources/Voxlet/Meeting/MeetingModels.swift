@@ -138,6 +138,16 @@ struct MeetingRecord: Codable {
     }()
 }
 
+/// Even with zh-CN requested, both transcribe models now and then answer a Taiwanese-accented speaker in
+/// Traditional characters; a Simplified meeting record should read one way throughout.
+enum ChineseScript {
+    static func normalize(_ text: String, languageCodes: [String]) -> String {
+        guard languageCodes.contains(where: { $0.hasPrefix("zh-CN") || $0.hasPrefix("zh-Hans") || $0 == "zh" || $0.hasPrefix("cmn") })
+        else { return text }
+        return text.applyingTransform(StringTransform(rawValue: "Hant-Hans"), reverse: false) ?? text
+    }
+}
+
 enum MeetingFormat {
     static func duration(_ seconds: TimeInterval) -> String {
         let s = Int(seconds.rounded())

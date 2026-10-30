@@ -144,7 +144,11 @@ enum MeetingPrompts {
 /// Offline transcription with Vertex gemini-3.5-transcribe: more accurate than the live model, and the only one
 /// that can tell speakers apart. Agent Platform only; the request shape was captured from google-genai.
 struct MeetingOfflineTranscriber {
-    static let chunkSeconds: TimeInterval = 840
+    /// 14 minutes, under the 15-minute limit for diarization on Agent Platform. VOXLET_OFFLINE_CHUNK_SECONDS lets
+    /// the self-test exercise several chunks with a short meeting.
+    static var chunkSeconds: TimeInterval {
+        Double(ProcessInfo.processInfo.environment["VOXLET_OFFLINE_CHUNK_SECONDS"] ?? "") ?? 840
+    }
     var apiKey: String
     var languageCodes: [String]
 
@@ -166,7 +170,11 @@ struct MeetingOfflineTranscriber {
             let parts = try await request(Data(contentsOf: chunk.url), diarize: diarize)
             for part in parts {
                 let speaker = label ?? "c\(index)-\(part.speaker ?? "spk:0")"
-                segments += part.segments(speaker: speaker, offset: chunk.offset)
+                segments += part.segments(speaker: speaker, offset: chunk.offset).map { segment in
+                    var copy = segment
+                    copy.text = ChineseScript.normalize(segment.text, languageCodes: languageCodes)
+                    return copy
+                }
             }
         }
         return segments

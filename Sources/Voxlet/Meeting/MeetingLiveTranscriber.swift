@@ -312,8 +312,8 @@ private final class LiveConnection: NSObject, URLSessionWebSocketDelegate {
     func drain() {
         guard !isClosed, !draining else { return }
         draining = true
-        log?("drain, waiting on \(turns.count) turns, \(outbox.count) queued, ready \(ready)")
-        if turns.isEmpty && outbox.isEmpty { return close(reason: "drained") }
+        log?("drain, waiting on \(turns.count) turns, \(outbox.count + held.count) queued, ready \(ready)")
+        if turns.isEmpty && outbox.isEmpty && held.isEmpty { return close(reason: "drained") }
         queue.asyncAfter(deadline: .now() + 12) { [weak self] in self?.close(reason: "drain timeout") }
     }
 
@@ -327,7 +327,40 @@ private final class LiveConnection: NSObject, URLSessionWebSocketDelegate {
     }
 
     private func enqueue(_ payload: [String: Any]) {
-        if ready { transmit(payload) } else if outbox.count < 600 { outbox.append(payload) }
+        if ready { route(payload) } else if outbox.count < 600 { outbox.append(payload) }
+    }
+
+    /// Turns go to the server one at a time. Starting the next turn before the last one is answered let Gemini
+    /// merge the two into one final (a 0.5 s gap between speakers), which shifted every later final onto the wrong
+    /// side. So after an activityEnd, everything waits for that turn's generationComplete, or 2.5 s.
+    private var held: [[String: Any]] = []
+    private var awaitingCompletion = false
+    private var gateTimeout: DispatchWorkItem?
+
+    private func route(_ payload: [String: Any]) {
+        if awaitingCompletion {
+            held.append(payload)
+            return
+        }
+        transmit(payload)
+        if (payload["realtimeInput"] as? [String: Any])?["activityEnd"] != nil {
+            awaitingCompletion = true
+            let timeout = DispatchWorkItem { [weak self] in
+                self?.log?("no completion after 2.5 s, sending on")
+                self?.openGate()
+            }
+            gateTimeout = timeout
+            queue.asyncAfter(deadline: .now() + 2.5, execute: timeout)
+        }
+    }
+
+    private func openGate() {
+        gateTimeout?.cancel()
+        gateTimeout = nil
+        awaitingCompletion = false
+        let pending = held
+        held = []
+        pending.forEach(route)
     }
 
     private func transmit(_ payload: [String: Any]) {
@@ -365,8 +398,9 @@ private final class LiveConnection: NSObject, URLSessionWebSocketDelegate {
         if object["setupComplete"] != nil || object["setup_complete"] != nil {
             guard !ready else { return }
             ready = true
-            outbox.forEach(transmit)
+            let queued = outbox
             outbox.removeAll()
+            queued.forEach(route)
             return
         }
         if let meta = (object["usageMetadata"] ?? object["usage_metadata"]) as? [String: Any] {
@@ -383,7 +417,8 @@ private final class LiveConnection: NSObject, URLSessionWebSocketDelegate {
             return
         }
         guard let content = (object["serverContent"] ?? object["server_content"]) as? [String: Any] else { return }
-        if let final = Self.text(in: content, "inputTranscription", "input_transcription") {
+        if let raw = Self.text(in: content, "inputTranscription", "input_transcription") {
+            let final = ChineseScript.normalize(raw, languageCodes: config.languageCodes)
             // The oldest turn still waiting for its text, preferring one that has already ended.
             if let index = turns.firstIndex(where: { !$0.answered && $0.end != nil }) ?? turns.firstIndex(where: { !$0.answered }) {
                 turns[index].answered = true
@@ -401,7 +436,8 @@ private final class LiveConnection: NSObject, URLSessionWebSocketDelegate {
             if let index = turns.firstIndex(where: { !$0.completed && $0.end != nil }) { turns[index].completed = true }
             // A completed turn with no text was silence or noise; it must not take the next turn's final.
             turns.removeAll { $0.completed && ($0.answered || $0.end != nil) }
-            if draining, turns.isEmpty { close(reason: "drained") }
+            openGate()
+            if draining, turns.isEmpty, held.isEmpty { close(reason: "drained") }
         }
     }
 
