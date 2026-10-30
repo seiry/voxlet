@@ -55,6 +55,10 @@ floor: the score a sentence gets when it is not in the audio at all.
 
 ### Other measurements
 
+- **Not limited to the probe's own process tree**: B repeated with the remote `afplay` started by the shell
+  (`b_external.sh`), so it is not a child of the probe, as a browser would not be. Results:
+  - Remote stretches -52.9 dBFS, local talker -24.4 dBFS, so a +28.5 dB margin, the same as B.
+  - Vertex returned exactly the 5 local sentences (gaps 100, double talk 100, remote 20).
 - **Me/them labels from the tap reference** (mic-only plan): 8 of 8 non-overlapping sentences right in
   every round. Per 50 ms frame it is only 79%, because pauses inside a remote sentence read as room tail.
 - **Offline diarization**, Vertex with diarization on, per round:
@@ -90,7 +94,8 @@ floor: the score a sentence gets when it is not in the audio at all.
 ## Conclusions
 
 1. **Use Apple voice processing on the mic, and do not hijack.** On built-in speakers it removes
-   everything the Mac plays, from any app, and keeps a voice from elsewhere in the room. Compared with
+   everything the Mac plays, from any app (including one unrelated to ours), and keeps a voice from
+   elsewhere in the room. Compared with
    hijacking, it gives 7 dB more margin, never dropped a sentence, and needs no replay path, so Meet's own
    echo canceller is untouched. The costs:
    - The meeting plays about 6 dB quieter.
@@ -118,6 +123,8 @@ floor: the score a sentence gets when it is not in the audio at all.
 - A Core Audio tap of a real browser. Process taps were not exercised; the remote track itself stood in
   for the tap.
 - OpenAI's transcription models: the gateway token has no access.
+- What `kAUVoiceIOProperty_BypassVoiceProcessing` does here is unclear. With bypass on, the probe's own
+  capture was also near silent, and that was not cross-checked on the iPhone mic.
 
 ## Reproduce
 
