@@ -44,6 +44,7 @@ enum MeetingSelfTest {
             controller.onFinished = { folder, record in
                 report["folder"] = folder.path
                 report["record"] = recordJSON(record)
+                report["liveTrace"] = controller.lastLiveTrace
                 done = true
             }
             controller.onError = { message in
@@ -79,6 +80,7 @@ enum MeetingSelfTest {
         controller.onFinished = { folder, record in
             report["folder"] = folder.path
             report["record"] = encodable(record)
+            report["liveTrace"] = controller.lastLiveTrace
             done = true
         }
         controller.onError = { message in

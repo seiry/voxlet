@@ -33,6 +33,14 @@ final class MeetingLiveTranscriber {
     private var now: TimeInterval = 0
     private var reconnects: [Date] = []
     private var finishing = false
+    /// Turn and session events with meeting times, for the self-test report.
+    private var trace: [String] = []
+
+    var traceSnapshot: [String] { queue.sync { trace } }
+
+    private func log(_ event: String) {
+        trace.append(String(format: "%6.1f %@", now, event))
+    }
 
     init(config: GeminiLiveConfig) {
         var config = config
@@ -68,10 +76,12 @@ final class MeetingLiveTranscriber {
                 switch event {
                 case .begin(let side):
                     let start = time - Double(preroll.count) * MeetingMixer.chunkSeconds
+                    log("begin \(side.rawValue)")
                     current?.beginTurn(side, at: max(0, start))
                     preroll.forEach { current?.sendAudio($0) }
                     preroll.removeAll()
                 case .end:
+                    log("end")
                     current?.endTurn(at: time)
                 }
             }
@@ -86,6 +96,7 @@ final class MeetingLiveTranscriber {
     func finish(completion: @escaping () -> Void) {
         queue.async { [self] in
             finishing = true
+            log("finish, open turn: \(segmenter.side?.rawValue ?? "none")")
             if segmenter.side != nil { current?.endTurn(at: now) }
             if let current { draining.append(current) }
             current = nil
@@ -126,7 +137,10 @@ final class MeetingLiveTranscriber {
 
     private func open(at time: TimeInterval) {
         sessionsOpened += 1
+        log("open session \(sessionsOpened)")
         let connection = LiveConnection(config: config, openedAt: time, queue: queue)
+        let number = sessionsOpened
+        connection.log = { [weak self] event in self?.log("s\(number) \(event)") }
         connection.onInterim = { [weak self] side, text in DispatchQueue.main.async { self?.onInterim?(side, text) } }
         connection.onTurn = { [weak self] turn in DispatchQueue.main.async { self?.onTurn?(turn) } }
         connection.onUsage = { [weak self] add in
@@ -238,6 +252,7 @@ private final class LiveConnection: NSObject, URLSessionWebSocketDelegate {
     var onTurn: ((MeetingLiveTranscriber.Turn) -> Void)?
     var onUsage: ((GeminiUsage) -> Void)?
     var onClosed: ((String) -> Void)?
+    var log: ((String) -> Void)?
 
     let openedAt: TimeInterval
     private let config: GeminiLiveConfig
@@ -297,6 +312,7 @@ private final class LiveConnection: NSObject, URLSessionWebSocketDelegate {
     func drain() {
         guard !isClosed, !draining else { return }
         draining = true
+        log?("drain, waiting on \(turns.count) turns, \(outbox.count) queued, ready \(ready)")
         if turns.isEmpty && outbox.isEmpty { return close(reason: "drained") }
         queue.asyncAfter(deadline: .now() + 12) { [weak self] in self?.close(reason: "drain timeout") }
     }
@@ -304,6 +320,7 @@ private final class LiveConnection: NSObject, URLSessionWebSocketDelegate {
     func close(reason: String = "closed") {
         guard !isClosed else { return }
         isClosed = true
+        log?("closed: \(reason)")
         task?.cancel(with: .normalClosure, reason: nil)
         session?.finishTasksAndInvalidate()
         onClosed?(reason)
@@ -371,6 +388,7 @@ private final class LiveConnection: NSObject, URLSessionWebSocketDelegate {
             if let index = turns.firstIndex(where: { !$0.answered && $0.end != nil }) ?? turns.firstIndex(where: { !$0.answered }) {
                 turns[index].answered = true
                 let turn = turns[index]
+                log?("final for turn \(index) (\(turn.side.rawValue)): \(final.prefix(16))")
                 onTurn?(.init(side: turn.side, text: final, start: turn.start, end: turn.end ?? turn.start))
                 onInterim?(turn.side, "")
             }
@@ -379,6 +397,7 @@ private final class LiveConnection: NSObject, URLSessionWebSocketDelegate {
             onInterim?(turn.side, partial)
         }
         if (content["generationComplete"] as? Bool) == true || (content["generation_complete"] as? Bool) == true {
+            log?("complete, \(turns.count) turns open")
             if let index = turns.firstIndex(where: { !$0.completed && $0.end != nil }) { turns[index].completed = true }
             // A completed turn with no text was silence or noise; it must not take the next turn's final.
             turns.removeAll { $0.completed && ($0.answered || $0.end != nil) }

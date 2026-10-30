@@ -49,6 +49,8 @@ final class MeetingController: ObservableObject {
     private var browserTrack: MeetingTrack?
     private var mixer: MeetingMixer?
     private var live: MeetingLiveTranscriber?
+    /// The last meeting's Live turn and session events, for the self-test report.
+    private(set) var lastLiveTrace: [String] = []
     private var ticker: Timer?
     private var startedAt = Date()
     private var notesCursor = 0
@@ -287,6 +289,7 @@ final class MeetingController: ObservableObject {
 
     private func finalize() {
         guard let folder else { return reset() }
+        lastLiveTrace = live?.traceSnapshot ?? []
         if let usage = live?.usage {
             UsageStore.shared.add(UsageRecord(date: Date(), audioSeconds: elapsed, usage: usage,
                                               characters: lines.reduce(0) { $0 + $1.text.count }))
