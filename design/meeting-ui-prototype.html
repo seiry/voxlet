@@ -1,0 +1,745 @@
+<title>Voxlet 会议记录</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: a simulated two-display desk; the floating panel lives on top and is placed per display
+   with relative coordinates, the same model the native app will use (screen id + relative origin). */
+:root {
+  --page: #e9ecf1;
+  --ink: #1c2028;
+  --ink-2: #5a6271;
+  --ink-3: #8a91a0;
+  --line: rgba(22, 32, 52, 0.12);
+  --panel: rgba(249, 250, 252, 0.84);
+  --panel-solid: #f7f8fa;
+  --chip: rgba(22, 32, 52, 0.06);
+  --menubar: rgba(247, 248, 250, 0.78);
+  --me: #2f68d8;
+  --me-soft: rgba(47, 104, 216, 0.1);
+  --them: #2a8160;
+  --them-soft: rgba(42, 129, 96, 0.1);
+  --s1: #b8661f;
+  --s2: #8452c2;
+  --rec: #e0443a;
+  --ok: #2a8160;
+  --star: #c98a12;
+  --star-soft: rgba(201, 138, 18, 0.14);
+  --wall-a1: #c9d6e8;
+  --wall-a2: #9fb3cf;
+  --wall-b1: #d7d2e6;
+  --wall-b2: #aab8cc;
+  --shadow: 0 18px 50px rgba(18, 26, 44, 0.22), 0 2px 6px rgba(18, 26, 44, 0.12);
+  --ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --page: #0f1217; --ink: #e8eaef; --ink-2: #a0a7b4; --ink-3: #737b89; --line: rgba(255, 255, 255, 0.1);
+    --panel: rgba(34, 38, 47, 0.8); --panel-solid: #22262f; --chip: rgba(255, 255, 255, 0.07);
+    --menubar: rgba(30, 33, 41, 0.78); --me: #77a6ff; --me-soft: rgba(119, 166, 255, 0.14); --them: #62c79b;
+    --them-soft: rgba(98, 199, 155, 0.13); --s1: #eea25e; --s2: #b893f2; --rec: #ff6257; --ok: #62c79b;
+    --star: #f0b640; --star-soft: rgba(240, 182, 64, 0.16); --wall-a1: #24324a; --wall-a2: #151d2c;
+    --wall-b1: #2c2740; --wall-b2: #171b27; --shadow: 0 18px 50px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --page: #0f1217; --ink: #e8eaef; --ink-2: #a0a7b4; --ink-3: #737b89; --line: rgba(255, 255, 255, 0.1);
+  --panel: rgba(34, 38, 47, 0.8); --panel-solid: #22262f; --chip: rgba(255, 255, 255, 0.07);
+  --menubar: rgba(30, 33, 41, 0.78); --me: #77a6ff; --me-soft: rgba(119, 166, 255, 0.14); --them: #62c79b;
+  --them-soft: rgba(98, 199, 155, 0.13); --s1: #eea25e; --s2: #b893f2; --rec: #ff6257; --ok: #62c79b;
+  --star: #f0b640; --star-soft: rgba(240, 182, 64, 0.16); --wall-a1: #24324a; --wall-a2: #151d2c;
+  --wall-b1: #2c2740; --wall-b2: #171b27; --shadow: 0 18px 50px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--page); color: var(--ink); font-family: var(--ui); font-size: 14px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 18px 28px;
+}
+button { font: inherit; color: inherit; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--me); outline-offset: 2px; }
+.wrap { max-width: 1320px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+
+/* prototype controls */
+.proto { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+.proto h1 { font-size: 18px; margin: 0; font-weight: 650; letter-spacing: 0.01em; text-wrap: balance; }
+.proto h1 small { font-weight: 450; color: var(--ink-2); font-size: 13px; margin-left: 8px; }
+.ctrls { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-left: auto; }
+.ctrl-label { font-size: 12px; color: var(--ink-2); }
+.seg { display: inline-flex; background: var(--chip); border-radius: 8px; padding: 2px; }
+.seg button { border: 0; background: none; padding: 4px 10px; border-radius: 6px; font-size: 12.5px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--panel-solid); box-shadow: 0 1px 2px rgba(0,0,0,.15); }
+.btn { border: 1px solid var(--line); background: var(--panel-solid); border-radius: 7px; padding: 4px 10px; font-size: 12.5px; cursor: pointer; }
+.btn:hover { border-color: var(--ink-3); }
+.hint { font-size: 12.5px; color: var(--ink-2); margin: 0; }
+
+/* desk + displays */
+.desk { position: relative; display: grid; grid-template-columns: 1.08fr 1fr; gap: 22px; align-items: end; }
+.display { position: relative; min-width: 0; }
+.bezel { border-radius: 12px; padding: 7px; background: #1b1e24; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
+.screen {
+  position: relative; border-radius: 6px; overflow: hidden; aspect-ratio: 16 / 10; min-height: 420px; width: 100%;
+  background: linear-gradient(150deg, var(--wall-a1), var(--wall-a2));
+}
+.display[data-id="d2"] .screen { background: linear-gradient(200deg, var(--wall-b1), var(--wall-b2)); }
+.display.sharing .screen::after {
+  content: ""; position: absolute; inset: 0; border: 3px solid var(--rec); border-radius: 6px; pointer-events: none;
+}
+.share-tag {
+  position: absolute; right: 10px; bottom: 10px; z-index: 3; background: var(--rec); color: #fff; font-size: 11.5px;
+  padding: 2px 8px; border-radius: 6px;
+}
+.caption { text-align: center; font-size: 12px; color: var(--ink-2); margin-top: 8px; }
+.menubar {
+  position: absolute; inset: 0 0 auto; height: 26px; display: flex; align-items: center; gap: 14px; padding: 0 10px;
+  background: var(--menubar); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); font-size: 12.5px; z-index: 4;
+}
+.menubar .app { font-weight: 650; }
+.menubar .right { margin-left: auto; display: flex; align-items: center; gap: 12px; font-variant-numeric: tabular-nums; }
+.vx-icon {
+  display: inline-flex; align-items: center; gap: 5px; border: 0; background: none; padding: 2px 6px; border-radius: 5px; cursor: pointer;
+}
+.vx-icon:hover, .vx-icon[aria-expanded="true"] { background: var(--chip); }
+.vx-icon .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--rec); display: none; }
+.recording .vx-icon .dot { display: inline-block; animation: pulse 1.6s ease-in-out infinite; }
+.vx-icon .t { display: none; font-family: var(--mono); font-size: 11.5px; }
+.recording .vx-icon .t { display: inline; }
+@keyframes pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .recording .vx-icon .dot { animation: none; } }
+
+/* fake app windows */
+.win {
+  position: absolute; border-radius: 10px; background: var(--panel-solid); box-shadow: 0 8px 26px rgba(0,0,0,.18);
+  overflow: hidden; display: flex; flex-direction: column;
+}
+.win-bar { height: 28px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--ink-2); }
+.lights { display: flex; gap: 6px; }
+.lights i { width: 10px; height: 10px; border-radius: 50%; background: #ff5f57; }
+.lights i:nth-child(2) { background: #febc2e; } .lights i:nth-child(3) { background: #28c840; }
+.meet { left: 4%; top: 13%; width: 70%; height: 78%; }
+.meet .grid { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 8px; background: #202124; }
+.tile { border-radius: 8px; background: #3c4043; display: grid; place-items: center; color: #e8eaed; font-size: 12px; position: relative; }
+.tile .av { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-weight: 650; font-size: 17px; color: #fff; }
+.tile .nm { position: absolute; left: 8px; bottom: 6px; font-size: 11px; }
+.tile.talking { box-shadow: inset 0 0 0 2px #8ab4f8; }
+.notes-app { left: 8%; top: 16%; width: 58%; height: 66%; }
+.notes-app .body { padding: 12px 14px; font-size: 12.5px; color: var(--ink-2); display: flex; flex-direction: column; gap: 6px; }
+.notes-app .body b { color: var(--ink); }
+
+/* Voxlet menu */
+.vx-menu {
+  position: absolute; z-index: 30; min-width: 230px; padding: 5px; border-radius: 9px; background: var(--panel);
+  backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); box-shadow: var(--shadow); border: 1px solid var(--line); font-size: 13px;
+}
+.vx-menu .status { padding: 4px 10px 6px; color: var(--ink-2); font-size: 12px; }
+.vx-menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 6px; }
+.vx-menu button { display: flex; width: 100%; justify-content: space-between; border: 0; background: none; text-align: left; padding: 4px 10px; border-radius: 5px; cursor: pointer; }
+.vx-menu button:hover:not(:disabled) { background: var(--me); color: #fff; }
+.vx-menu button:disabled { color: var(--ink-3); cursor: default; }
+.vx-menu .kbd { color: var(--ink-3); font-size: 12px; }
+.vx-menu button:hover:not(:disabled) .kbd { color: rgba(255,255,255,.8); }
+.vx-menu .primary { font-weight: 600; }
+
+/* floating panel */
+.panel {
+  position: absolute; z-index: 20; width: 316px; display: flex; flex-direction: column; border-radius: 13px; background: var(--panel);
+  backdrop-filter: blur(26px) saturate(1.4); -webkit-backdrop-filter: blur(26px) saturate(1.4); box-shadow: var(--shadow);
+  border: 1px solid var(--line); overflow: hidden; touch-action: none;
+}
+.panel.dragging { cursor: grabbing; opacity: .96; }
+.p-head { display: flex; align-items: center; gap: 8px; padding: 9px 10px 7px 12px; cursor: grab; user-select: none; }
+.rec-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rec); flex: none; animation: pulse 1.6s ease-in-out infinite; }
+.paused .rec-dot { background: var(--ink-3); animation: none; }
+@media (prefers-reduced-motion: reduce) { .rec-dot { animation: none; } }
+.p-title { font-weight: 600; font-size: 13px; }
+.p-time { font-family: var(--mono); font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.icon-btn { border: 0; background: none; width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; cursor: pointer; color: var(--ink-2); }
+.icon-btn:hover { background: var(--chip); color: var(--ink); }
+.p-head .icon-btn:first-of-type { margin-left: auto; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 12px 8px; }
+.chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; padding: 1px 7px; border-radius: 999px; background: var(--chip); color: var(--ink-2); }
+.chip .ok { color: var(--ok); font-weight: 700; }
+.chip.warn { color: var(--rec); background: transparent; border: 1px solid var(--line); }
+.tabs { display: flex; gap: 2px; padding: 0 8px; border-bottom: 1px solid var(--line); }
+.tabs button { position: relative; border: 0; background: none; padding: 6px 9px 7px; font-size: 12.5px; color: var(--ink-2); cursor: pointer; }
+.tabs button[aria-selected="true"] { color: var(--ink); font-weight: 600; }
+.tabs button[aria-selected="true"]::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--ink); }
+.tabs .new::before { content: ""; position: absolute; right: 2px; top: 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--me); }
+.p-body { flex: 1 1 auto; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.line { display: grid; grid-template-columns: 34px 1fr; gap: 6px; font-size: 13px; line-height: 1.55; }
+.who { font-size: 11.5px; font-weight: 600; padding-top: 2px; }
+.who.me { color: var(--me); } .who.them { color: var(--them); }
+.txt { min-width: 0; overflow-wrap: anywhere; }
+.line.me .txt { background: var(--me-soft); border-radius: 8px; padding: 2px 7px; }
+.line.starred .txt { box-shadow: inset 3px 0 0 var(--star); background: var(--star-soft); border-radius: 6px; padding: 2px 7px; }
+.interim { color: var(--ink-3); }
+.empty { color: var(--ink-3); font-size: 12.5px; padding: 18px 4px; text-align: center; }
+.note-sec h4 { margin: 2px 0 3px; font-size: 11.5px; letter-spacing: .06em; color: var(--ink-3); font-weight: 600; }
+.note-sec ul { margin: 0; padding-left: 16px; font-size: 13px; display: flex; flex-direction: column; gap: 2px; }
+.note-sec li.todo { list-style: none; margin-left: -16px; }
+.note-sec .by { color: var(--ink-3); font-size: 11.5px; }
+.note-meta { font-size: 11.5px; color: var(--ink-3); }
+.ask-form { display: flex; gap: 6px; }
+.ask-form input { flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--panel-solid); border-radius: 7px; padding: 5px 8px; font: inherit; font-size: 13px; color: var(--ink); }
+.qa { display: flex; flex-direction: column; gap: 3px; font-size: 13px; }
+.qa .q { font-weight: 600; }
+.qa .a { color: var(--ink-2); }
+.suggest { display: flex; flex-wrap: wrap; gap: 5px; }
+.suggest button { border: 1px solid var(--line); background: none; border-radius: 999px; padding: 1px 9px; font-size: 12px; cursor: pointer; color: var(--ink-2); }
+.p-foot { display: flex; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--line); }
+.p-foot button { flex: 1; display: inline-flex; justify-content: center; align-items: center; gap: 5px; border: 1px solid var(--line); background: var(--panel-solid); border-radius: 7px; padding: 4px 6px; font-size: 12.5px; cursor: pointer; }
+.p-foot button:hover { border-color: var(--ink-3); }
+.p-foot .end { color: var(--rec); }
+.progress { padding: 14px 12px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.step { display: flex; gap: 8px; align-items: center; color: var(--ink-3); }
+.step.done { color: var(--ink); } .step.active { color: var(--ink); font-weight: 600; }
+.step i { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid currentColor; flex: none; display: grid; place-items: center; font-style: normal; font-size: 9px; }
+.step.done i { background: var(--ok); border-color: var(--ok); color: #fff; }
+.bar { height: 4px; border-radius: 4px; background: var(--chip); overflow: hidden; }
+.bar span { display: block; height: 100%; background: var(--me); width: 0; transition: width .4s; }
+
+/* collapsed strip */
+.panel.collapsed { width: 280px; }
+.panel.collapsed .chips, .panel.collapsed .tabs, .panel.collapsed .p-body, .panel.collapsed .p-foot { display: none; }
+.strip-last { display: none; font-size: 12.5px; color: var(--ink-2); padding: 0 12px 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.panel.collapsed .strip-last { display: block; }
+
+/* toast */
+.toast {
+  position: absolute; z-index: 40; right: 10px; top: 34px; width: min(300px, calc(100% - 20px)); padding: 9px 12px; border-radius: 11px;
+  background: var(--panel); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid var(--line);
+  box-shadow: var(--shadow); font-size: 12.5px;
+}
+.toast b { display: block; font-size: 12.5px; }
+.toast span { color: var(--ink-2); }
+
+/* meeting detail window */
+.detail {
+  position: absolute; z-index: 25; display: flex; flex-direction: column; border-radius: 12px; background: var(--panel-solid);
+  box-shadow: var(--shadow); border: 1px solid var(--line); overflow: hidden;
+}
+.d-bar { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.d-bar .lights i { cursor: pointer; }
+.d-title { font-weight: 650; font-size: 14px; }
+.d-meta { font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.speakers { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.speakers .lab { color: var(--ink-2); }
+.spk { display: inline-flex; align-items: center; gap: 6px; }
+.swatch { width: 9px; height: 9px; border-radius: 50%; }
+.spk select { font: inherit; font-size: 12.5px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-solid); color: var(--ink); padding: 1px 4px; }
+.guess { font-size: 11px; color: var(--ink-3); }
+.d-cols { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); }
+.d-col { min-width: 0; overflow-y: auto; padding: 10px 14px; display: flex; flex-direction: column; gap: 10px; }
+.d-col + .d-col { border-left: 1px solid var(--line); }
+.d-col h3 { margin: 0; font-size: 11.5px; letter-spacing: .06em; color: var(--ink-3); font-weight: 600; }
+.md h2 { font-size: 13.5px; margin: 6px 0 3px; }
+.md p, .md ul { margin: 0; font-size: 13px; }
+.md ul { padding-left: 16px; display: flex; flex-direction: column; gap: 2px; }
+.md li.todo { list-style: none; margin-left: -16px; }
+.tline { display: grid; grid-template-columns: 52px 62px 1fr; gap: 6px; font-size: 13px; }
+.tline .ts { font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); padding-top: 2px; font-variant-numeric: tabular-nums; }
+.tline .nm { font-weight: 600; font-size: 12px; padding-top: 1px; }
+.tline .tx { min-width: 0; overflow-wrap: anywhere; }
+.tline.starred .tx { background: var(--star-soft); box-shadow: inset 3px 0 0 var(--star); border-radius: 5px; padding: 0 6px; }
+.d-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--line); }
+.path { font-family: var(--mono); font-size: 11.5px; color: var(--ink-2); min-width: 0; overflow-wrap: anywhere; flex: 1 1 260px; }
+.d-foot .btn.primary { background: var(--me); color: #fff; border-color: transparent; }
+.hint-bubble {
+  position: absolute; z-index: 15; top: 32px; right: 8px; max-width: 220px; padding: 7px 10px; border-radius: 9px; font-size: 12px;
+  background: var(--me); color: #fff; box-shadow: var(--shadow);
+}
+.hint-bubble::before { content: ""; position: absolute; top: -5px; right: 34px; width: 10px; height: 10px; background: var(--me); transform: rotate(45deg); }
+.notes-foot { font-size: 12px; color: var(--ink-2); display: flex; flex-direction: column; gap: 4px; }
+.notes-foot code { font-family: var(--mono); font-size: 11.5px; }
+
+@media (max-width: 860px) {
+  .desk { grid-template-columns: 1fr; }
+  .screen { aspect-ratio: auto; height: 470px; min-height: 0; }
+  .meet { width: 88%; left: 6%; }
+  .d-cols { grid-template-columns: 1fr; }
+  .d-col + .d-col { border-left: 0; border-top: 1px solid var(--line); }
+}
+</style>
+
+<div class="wrap">
+  <div class="proto">
+    <h1>Voxlet 会议记录<small>交互原型</small></h1>
+    <div class="ctrls">
+      <span class="ctrl-label">输出设备</span>
+      <div class="seg" role="group" aria-label="输出设备">
+        <button id="outSpk" aria-pressed="true">扬声器</button>
+        <button id="outHp" aria-pressed="false">耳机</button>
+      </div>
+      <button class="btn" id="shareBtn" aria-pressed="false">模拟屏幕共享</button>
+      <span class="ctrl-label">速度</span>
+      <div class="seg" role="group" aria-label="播放速度">
+        <button id="sp1" aria-pressed="true">1×</button>
+        <button id="sp3" aria-pressed="false">3×</button>
+      </div>
+      <button class="btn" id="resetPos">重置悬浮窗位置</button>
+    </div>
+  </div>
+  <p class="hint">从左边屏幕菜单栏右上角的 Voxlet 图标开始。悬浮窗的标题栏可以拖到另一块显示器，刷新页面后它会回到上次的位置。</p>
+
+  <div class="desk" id="desk">
+    <section class="display" data-id="d1" aria-label="MacBook Pro 内建显示器">
+      <div class="bezel"><div class="screen">
+        <div class="menubar">
+          <span class="app">Firefox</span><span>文件</span><span>编辑</span><span>显示</span>
+          <span class="right">
+            <button class="vx-icon" data-menu aria-expanded="false" aria-label="Voxlet 菜单">
+              <svg width="16" height="14" viewBox="0 0 16 14" aria-hidden="true"><g fill="currentColor"><rect x="1" y="5" width="2" height="4" rx="1"/><rect x="5" y="2" width="2" height="10" rx="1"/><rect x="9" y="0" width="2" height="14" rx="1"/><rect x="13" y="4" width="2" height="6" rx="1"/></g></svg>
+              <span class="dot"></span><span class="t">00:00</span>
+            </button>
+            <span class="clock">10月30日 周四 14:00</span>
+          </span>
+        </div>
+        <div class="win meet">
+          <div class="win-bar"><span class="lights"><i></i><i></i><i></i></span>Meet - Voxlet 周会 · meet.google.com</div>
+          <div class="grid">
+            <div class="tile" data-tile="S1"><div class="av" style="background:#b8661f">王</div><span class="nm">王浩</span></div>
+            <div class="tile" data-tile="S2"><div class="av" style="background:#8452c2">S</div><span class="nm">Shelley</span></div>
+            <div class="tile" data-tile="me"><div class="av" style="background:#2f68d8">S</div><span class="nm">Seiry（你）</span></div>
+            <div class="tile"><span style="opacity:.7">3 位参会者</span></div>
+          </div>
+        </div>
+        <div class="hint-bubble" id="hintBubble">点这里，选“开始会议记录”</div>
+      </div></div>
+      <div class="caption">MacBook Pro 内建显示器</div>
+    </section>
+
+    <section class="display" data-id="d2" aria-label="外接显示器">
+      <div class="bezel"><div class="screen">
+        <div class="menubar">
+          <span class="app">备忘录</span><span>文件</span><span>编辑</span>
+          <span class="right">
+            <button class="vx-icon" data-menu aria-expanded="false" aria-label="Voxlet 菜单">
+              <svg width="16" height="14" viewBox="0 0 16 14" aria-hidden="true"><g fill="currentColor"><rect x="1" y="5" width="2" height="4" rx="1"/><rect x="5" y="2" width="2" height="10" rx="1"/><rect x="9" y="0" width="2" height="14" rx="1"/><rect x="13" y="4" width="2" height="6" rx="1"/></g></svg>
+              <span class="dot"></span><span class="t">00:00</span>
+            </button>
+            <span class="clock">14:00</span>
+          </span>
+        </div>
+        <div class="win notes-app">
+          <div class="win-bar"><span class="lights"><i></i><i></i><i></i></span>备忘录</div>
+          <div class="body"><b>本周</b><span>会议模式第一版</span><span>回声消除测试报告已提交</span></div>
+        </div>
+      </div></div>
+      <div class="caption">外接显示器 TS3400-U2L</div>
+    </section>
+
+    <div class="vx-menu" id="vxMenu" hidden role="menu"></div>
+
+    <aside class="panel" id="panel" hidden aria-label="会议记录悬浮窗">
+      <div class="p-head" id="pHead">
+        <span class="rec-dot" aria-hidden="true"></span>
+        <span class="p-title" id="pTitle">记录中</span>
+        <span class="p-time" id="pTime">00:00</span>
+        <button class="icon-btn" id="collapseBtn" aria-label="收起" title="收起">
+          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4.5 6 8l4-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <div class="strip-last" id="stripLast">等待第一句话</div>
+      <div class="chips" id="chips"></div>
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tab-live" aria-selected="true">转写</button>
+        <button role="tab" id="tab-notes" aria-selected="false">要点</button>
+        <button role="tab" id="tab-ask" aria-selected="false">问一问</button>
+      </div>
+      <div class="p-body" id="pBody"></div>
+      <div class="p-foot" id="pFoot">
+        <button id="starBtn" title="把刚才这句标为重点"><svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="m12 2.8 2.8 5.9 6.4.8-4.7 4.4 1.2 6.4L12 17.2l-5.7 3.1 1.2-6.4-4.7-4.4 6.4-.8z"/></svg>标记此刻</button>
+        <button id="pauseBtn"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path fill="currentColor" d="M2.5 1.5h2.2v9H2.5zM7.3 1.5h2.2v9H7.3z"/></svg><span>暂停</span></button>
+        <button id="endBtn" class="end"><svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true"><rect x="1.5" y="1.5" width="9" height="9" rx="1.5" fill="currentColor"/></svg>结束</button>
+      </div>
+    </aside>
+
+    <section class="detail" id="detail" hidden aria-label="会议详情"></section>
+    <div class="toast" id="toast" hidden></div>
+  </div>
+
+  <div class="notes-foot">
+    <span>原生实现说明：悬浮窗按显示器记住位置（显示器 ID 加窗口在该屏内的相对坐标），显示器拔掉后回到主屏；窗口设为不出现在屏幕共享画面里。</span>
+    <span>会议记录存放在 <code>~/Meetings/2026-10-30 1400 Voxlet 周会/</code>：<code>notes.md</code>、<code>transcript.md</code>、<code>audio/mic.m4a</code>、<code>audio/browser.m4a</code>。</span>
+  </div>
+</div>
+
+<script>
+(() => {
+  const SCRIPT = [
+    { s: "S1", t: "大家好，今天我们过一下 Voxlet 会议模式的进度，先说说上周的 release。" },
+    { s: "S2", t: "上周发了 0.3 版本，主要修了快捷键的问题，崩溃率已经降到百分之一以下。" },
+    { s: "me", t: "我补充一下，耳机模式我已经测过了，没有问题。" },
+    { s: "S1", t: "好的。那 Gemini Live 的十分钟限制，现在是怎么处理的？" },
+    { s: "S2", t: "我们会在第九分钟提前建一个新连接，两边重叠两秒，再做去重。" },
+    { s: "me", t: "对，这个方案我同意。" },
+    { s: "S1", t: "回声消除这块，要不要试一下 WebRTC 的 AEC3？" },
+    { s: "me", t: "不用了，我测过系统自带的回声消除，外放也能把对方的声音压掉 28 dB。" },
+    { s: "S2", t: "那代价是什么？" },
+    { s: "me", t: "会议的声音会小大概 6 dB，调高一点音量就好。" },
+    { s: "S1", t: "可以接受。那周五之前把会议模式的第一版做出来，Seiry 负责。" },
+    { s: "me", t: "没问题，我来跟进。" },
+    { s: "S2", t: "滚动总结用哪个模型？" },
+    { s: "me", t: "先用 gemini-3.8-flash，走我们自己的网关。" },
+  ];
+  const NAMES = { S1: ["王浩", "Shelley", "对方 1"], S2: ["Shelley", "王浩", "对方 2"] };
+  const POS_KEY = "vx-panel-pos-v1";
+  const UI_KEY = "vx-panel-ui-v1";
+  const $ = (id) => document.getElementById(id);
+  const desk = $("desk"), panel = $("panel"), pBody = $("pBody"), menu = $("vxMenu"), detail = $("detail");
+
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+    del(k) { try { localStorage.removeItem(k); } catch {} },
+  };
+
+  let state = "idle"; // idle | recording | paused | processing | done
+  let lines = [];     // { s, t, sec, starred }
+  let idx = 0, typed = 0, sec = 0, speed = 1, timer = null;
+  let tab = (store.get(UI_KEY) || {}).tab || "live";
+  let collapsed = !!(store.get(UI_KEY) || {}).collapsed;
+  let notesSeen = 0, headphones = false, sharing = false, askLog = [];
+  let names = { S1: "王浩", S2: "Shelley", me: "Seiry" };
+
+  const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  const clock = (s) => { const t = 14 * 3600 + s; return `${Math.floor(t / 3600)}:${String(Math.floor(t / 60) % 60).padStart(2, "0")}:${String(Math.floor(t % 60)).padStart(2, "0")}`; };
+  const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+  // ---------- placement: per display, relative coordinates ----------
+  function displays() { return [...desk.querySelectorAll(".display")]; }
+  function screenRect(d) {
+    const s = d.querySelector(".screen").getBoundingClientRect(), k = desk.getBoundingClientRect();
+    return { left: s.left - k.left, top: s.top - k.top + 30, width: s.width, height: s.height - 30 };
+  }
+  function placePanel() {
+    if (panel.hidden) return;
+    const pos = store.get(POS_KEY) || { display: "d1", rx: 1, ry: 0.04 };
+    const d = displays().find((x) => x.dataset.id === pos.display) || displays()[0];
+    const r = screenRect(d), pw = panel.offsetWidth;
+    panel.style.maxHeight = Math.max(160, r.height - 12) + "px";
+    const ph = panel.offsetHeight;
+    panel.style.left = r.left + Math.max(0, r.width - pw - 12) * pos.rx + 6 + "px";
+    panel.style.top = r.top + Math.max(0, r.height - ph - 12) * pos.ry + 6 + "px";
+  }
+  function savePlacement() {
+    const pr = panel.getBoundingClientRect(), k = desk.getBoundingClientRect();
+    const cx = pr.left - k.left + pr.width / 2, cy = pr.top - k.top + pr.height / 2;
+    let best = displays()[0], bestDist = Infinity;
+    for (const d of displays()) {
+      const r = screenRect(d);
+      const dx = Math.max(r.left - cx, 0, cx - (r.left + r.width)), dy = Math.max(r.top - cy, 0, cy - (r.top + r.height));
+      const dist = Math.hypot(dx, dy);
+      if (dist < bestDist) { bestDist = dist; best = d; }
+    }
+    const r = screenRect(best);
+    const clamp = (v) => Math.min(1, Math.max(0, v));
+    const rx = clamp((pr.left - k.left - r.left - 6) / Math.max(1, r.width - pr.width - 12));
+    const ry = clamp((pr.top - k.top - r.top - 6) / Math.max(1, r.height - pr.height - 12));
+    store.set(POS_KEY, { display: best.dataset.id, rx, ry });
+    placePanel();
+  }
+  (function drag() {
+    let sx, sy, ox, oy, on = false;
+    $("pHead").addEventListener("pointerdown", (e) => {
+      if (e.target.closest("button")) return;
+      on = true; panel.classList.add("dragging"); $("pHead").setPointerCapture(e.pointerId);
+      sx = e.clientX; sy = e.clientY; ox = panel.offsetLeft; oy = panel.offsetTop;
+    });
+    $("pHead").addEventListener("pointermove", (e) => {
+      if (!on) return;
+      const maxX = desk.clientWidth - panel.offsetWidth, maxY = desk.clientHeight - 40;
+      panel.style.left = Math.min(maxX, Math.max(0, ox + e.clientX - sx)) + "px";
+      panel.style.top = Math.min(maxY, Math.max(0, oy + e.clientY - sy)) + "px";
+    });
+    const up = () => { if (!on) return; on = false; panel.classList.remove("dragging"); savePlacement(); };
+    $("pHead").addEventListener("pointerup", up);
+    $("pHead").addEventListener("pointercancel", up);
+  })();
+  window.addEventListener("resize", () => { placePanel(); placeDetail(); });
+  $("resetPos").onclick = () => { store.del(POS_KEY); placePanel(); toast("位置已重置", "悬浮窗回到主屏右上角。"); };
+
+  // ---------- menu ----------
+  let menuAnchor = null;
+  function renderMenu() {
+    const rec = state === "recording" || state === "paused";
+    menu.innerHTML = `
+      <div class="status">${rec ? `正在记录 · ${fmt(sec)}` : "Gemini 3.5 Transcribe · 已就绪"}</div>
+      <hr>
+      <button role="menuitem" class="primary" id="mStart" ${rec || state === "processing" ? "disabled" : ""}>开始会议记录</button>
+      <button role="menuitem" id="mEnd" ${rec ? "" : "disabled"}>结束会议记录</button>
+      <button role="menuitem" id="mShow" ${panel.hidden ? "disabled" : ""}>显示悬浮窗</button>
+      <button role="menuitem" id="mFolder">打开会议记录文件夹</button>
+      <hr>
+      <button role="menuitem">开始听写 <span class="kbd">按住 fn</span></button>
+      <button role="menuitem">设置… <span class="kbd">⌘,</span></button>
+      <hr>
+      <button role="menuitem">退出 Voxlet <span class="kbd">⌘Q</span></button>`;
+    $("mStart").onclick = () => { closeMenu(); start(); };
+    $("mEnd").onclick = () => { closeMenu(); end(); };
+    $("mShow").onclick = () => { closeMenu(); if (collapsed) toggleCollapse(); placePanel(); };
+    $("mFolder").onclick = () => { closeMenu(); toast("在 Finder 中打开", "~/Meetings/"); };
+  }
+  function openMenu(btn) {
+    menuAnchor = btn; renderMenu(); menu.hidden = false;
+    btn.setAttribute("aria-expanded", "true");
+    const b = btn.getBoundingClientRect(), k = desk.getBoundingClientRect();
+    const left = Math.min(desk.clientWidth - menu.offsetWidth - 4, b.right - k.left - menu.offsetWidth + 20);
+    menu.style.left = Math.max(4, left) + "px"; menu.style.top = b.bottom - k.top + 4 + "px";
+    $("hintBubble").hidden = true;
+  }
+  function closeMenu() { menu.hidden = true; menuAnchor?.setAttribute("aria-expanded", "false"); menuAnchor = null; }
+  desk.querySelectorAll("[data-menu]").forEach((b) => b.addEventListener("click", (e) => {
+    e.stopPropagation(); menuAnchor === b ? closeMenu() : (closeMenu(), openMenu(b));
+  }));
+  document.addEventListener("click", (e) => { if (!menu.hidden && !menu.contains(e.target)) closeMenu(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMenu(); });
+
+  // ---------- simulation ----------
+  function start() {
+    state = "recording"; lines = []; idx = 0; typed = 0; sec = 0; notesSeen = 0; askLog = [];
+    detail.hidden = true; panel.hidden = false; panel.classList.remove("paused");
+    document.querySelectorAll(".display").forEach((d) => d.classList.add("recording"));
+    renderAll(); placePanel(); tick();
+    if (!headphones) toast("已开启回声消除", "外放时会议声音会小一点，可以调高音量。");
+  }
+  function tick() {
+    clearTimeout(timer);
+    if (state !== "recording") return;
+    const step = 90 / speed;
+    timer = setTimeout(() => {
+      sec += 0.09 * 1.0 * 1;
+      if (idx < SCRIPT.length) {
+        const cur = SCRIPT[idx];
+        typed += 1;
+        sec += 0.16;
+        if (typed > cur.t.length + 4) {
+          lines.push({ s: cur.s, t: cur.t, sec, starred: false });
+          idx += 1; typed = -6; sec += 0.8;
+        }
+      } else {
+        sec += 0.4;
+      }
+      renderLiveBits(); tick();
+    }, step);
+  }
+  function talkingTile() {
+    document.querySelectorAll(".tile").forEach((t) => t.classList.remove("talking"));
+    if (state !== "recording" || idx >= SCRIPT.length || typed < 0) return;
+    document.querySelector(`[data-tile="${SCRIPT[idx].s}"]`)?.classList.add("talking");
+  }
+
+  // ---------- notes model ----------
+  function notesFor(n, nm) {
+    const who = (s) => (s === "me" ? nm.me : nm[s]);
+    const sec = { 议题: [], 决定: [], 待办: [], 观点: [] };
+    if (n >= 1) sec.议题.push("会议模式进度，回顾上周 release");
+    if (n >= 2) sec.观点.push(`${who("S2")}：0.3 版修了快捷键问题，崩溃率降到 1% 以下`);
+    if (n >= 3) sec.观点.push(`${who("me")}：耳机模式已测试通过`);
+    if (n >= 5) { sec.议题.push("Gemini Live 十分钟会话上限"); sec.决定.push("第九分钟预建新连接，重叠两秒后去重"); }
+    if (n >= 8) { sec.议题.push("外放时的回声消除"); sec.决定.push("用系统自带回声消除，不上 WebRTC AEC3"); sec.观点.push(`${who("me")}：外放可压掉对方声音约 28 dB`); }
+    if (n >= 10) sec.观点.push(`${who("me")}：代价是会议音量小约 6 dB`);
+    if (n >= 12) sec.待办.push({ t: "周五前交付会议模式第一版", by: who("me") });
+    if (n >= 14) sec.决定.push("滚动总结用 gemini-3.8-flash，走自有网关");
+    return sec;
+  }
+  const notesVersion = (n) => [0, 1, 2, 3, 5, 8, 10, 12, 14].filter((x) => x <= n).length;
+
+  // ---------- rendering ----------
+  function chipsHTML() {
+    const aec = headphones ? `<span class="chip">回声消除 关（耳机）</span>` : `<span class="chip">回声消除 <span class="ok">开</span></span>`;
+    const share = sharing ? `<span class="chip warn">共享画面中已隐藏</span>` : "";
+    return `<span class="chip">麦克风 <span class="ok">✓</span></span><span class="chip">Firefox 声音 <span class="ok">✓</span></span>${aec}${share}`;
+  }
+  function liveHTML() {
+    if (!lines.length && (idx >= SCRIPT.length || typed < 1)) return `<div class="empty">正在听，第一句话出现在这里。</div>`;
+    let h = lines.map((l) => `<div class="line ${l.s === "me" ? "me" : "them"}${l.starred ? " starred" : ""}"><span class="who ${l.s === "me" ? "me" : "them"}">${l.s === "me" ? "我" : "对方"}</span><span class="txt">${esc(l.t)}</span></div>`).join("");
+    if (state === "recording" && idx < SCRIPT.length && typed > 0) {
+      const cur = SCRIPT[idx];
+      h += `<div class="line ${cur.s === "me" ? "me" : "them"}"><span class="who ${cur.s === "me" ? "me" : "them"}">${cur.s === "me" ? "我" : "对方"}</span><span class="txt interim">${esc(cur.t.slice(0, typed))}</span></div>`;
+    }
+    return h;
+  }
+  function notesHTML() {
+    const live = { S1: "对方", S2: "对方", me: "我" };
+    const n = notesFor(lines.length, live);
+    const starred = lines.filter((l) => l.starred);
+    if (!lines.length) return `<div class="empty">开会几分钟后，这里会出现议题、决定和待办。</div>`;
+    const sec = (title, items) => items.length ? `<div class="note-sec"><h4>${title}</h4><ul>${items.join("")}</ul></div>` : "";
+    return `<div class="note-meta">每 2 到 3 分钟更新一次 · 上次更新 ${clock(Math.floor(sec_last()))}</div>` +
+      sec("议题", n.议题.map((x) => `<li>${esc(x)}</li>`)) +
+      sec("决定", n.决定.map((x) => `<li>${esc(x)}</li>`)) +
+      sec("待办", n.待办.map((x) => `<li class="todo">☐ ${esc(x.t)} <span class="by">@${esc(x.by)}</span></li>`)) +
+      sec("各人观点", n.观点.map((x) => `<li>${esc(x)}</li>`)) +
+      sec("标记", starred.map((l) => `<li>${clock(Math.floor(l.sec))} ${esc(l.t)}</li>`));
+  }
+  const sec_last = () => (lines.length ? lines[lines.length - 1].sec : 0);
+  function askHTML() {
+    const qa = askLog.map((x) => `<div class="qa"><span class="q">${esc(x.q)}</span><span class="a">${esc(x.a)}</span></div>`).join("");
+    return `<form class="ask-form" id="askForm"><input id="askInput" placeholder="问问到目前为止的会议内容" autocomplete="off"><button class="btn" type="submit">问</button></form>
+      <div class="suggest"><button data-q="截止时间是哪天？">截止时间是哪天？</button><button data-q="我刚才答应了什么？">我刚才答应了什么？</button><button data-q="总结一下到现在">总结一下到现在</button></div>${qa}`;
+  }
+  function answer(q) {
+    const has = (k) => lines.some((l) => l.t.includes(k));
+    if (/截止|哪天|周五|deadline/i.test(q)) return has("周五") ? "周五之前交付会议模式第一版，由你负责（王浩在 14:01 左右提出）。" : "到目前为止还没有人提到截止时间。";
+    if (/答应|承诺|我刚才/.test(q)) return has("跟进") ? "你说会跟进会议模式第一版，周五前交付。" : "你还没有答应具体的事情。";
+    return `目前讨论了 ${notesFor(lines.length, { S1: "对方", S2: "对方", me: "我" }).议题.length} 个议题，${lines.length} 句话。要点页有分条整理。`;
+  }
+  function renderBody() {
+    const atBottom = pBody.scrollHeight - pBody.scrollTop - pBody.clientHeight < 40;
+    pBody.innerHTML = tab === "live" ? liveHTML() : tab === "notes" ? notesHTML() : askHTML();
+    if (tab === "live" && atBottom) pBody.scrollTop = pBody.scrollHeight;
+    if (tab === "ask") {
+      const f = $("askForm");
+      const ask = (q) => { if (!q.trim()) return; askLog.push({ q, a: answer(q) }); renderBody(); };
+      f.onsubmit = (e) => { e.preventDefault(); ask($("askInput").value); };
+      pBody.querySelectorAll("[data-q]").forEach((b) => (b.onclick = () => ask(b.dataset.q)));
+    }
+    if (tab === "notes") notesSeen = notesVersion(lines.length);
+  }
+  function renderTabs() {
+    ["live", "notes", "ask"].forEach((t) => $("tab-" + t).setAttribute("aria-selected", String(tab === t)));
+    $("tab-notes").classList.toggle("new", tab !== "notes" && notesVersion(lines.length) > notesSeen && lines.length > 0);
+  }
+  function renderHead() {
+    const paused = state === "paused";
+    $("pTitle").textContent = state === "processing" ? "正在整理" : paused ? "已暂停" : "记录中";
+    $("pTime").textContent = fmt(sec);
+    panel.classList.toggle("paused", paused || state === "processing");
+    document.querySelectorAll(".vx-icon .t").forEach((t) => (t.textContent = fmt(sec)));
+    const last = lines[lines.length - 1];
+    $("stripLast").textContent = last ? `${last.s === "me" ? "我" : "对方"}：${last.t}` : "等待第一句话";
+    $("pauseBtn").querySelector("span").textContent = paused ? "继续" : "暂停";
+  }
+  function renderLiveBits() { renderHead(); renderTabs(); if (tab !== "ask") renderBody(); talkingTile(); }
+  function renderAll() { $("chips").innerHTML = chipsHTML(); renderHead(); renderTabs(); renderBody(); talkingTile(); panel.classList.toggle("collapsed", collapsed); }
+
+  ["live", "notes", "ask"].forEach((t) => ($("tab-" + t).onclick = () => { tab = t; store.set(UI_KEY, { tab, collapsed }); renderTabs(); renderBody(); }));
+  function toggleCollapse() { collapsed = !collapsed; store.set(UI_KEY, { tab, collapsed }); panel.classList.toggle("collapsed", collapsed); $("collapseBtn").setAttribute("aria-label", collapsed ? "展开" : "收起"); placePanel(); }
+  $("collapseBtn").onclick = toggleCollapse;
+  $("starBtn").onclick = () => {
+    const l = lines[lines.length - 1];
+    if (!l) return toast("还没有可以标记的话", "第一句话出现后再试。");
+    l.starred = true; renderBody(); toast("已标记", `“${l.t.slice(0, 18)}…” 会在会后笔记里高亮。`);
+  };
+  $("pauseBtn").onclick = () => {
+    if (state === "recording") { state = "paused"; clearTimeout(timer); }
+    else if (state === "paused") { state = "recording"; tick(); }
+    renderAll();
+  };
+  $("endBtn").onclick = () => end();
+
+  function end() {
+    if (state !== "recording" && state !== "paused") return;
+    clearTimeout(timer);
+    if (idx < SCRIPT.length && typed > 4) { const c = SCRIPT[idx]; lines.push({ s: c.s, t: c.t, sec, starred: false }); idx += 1; }
+    state = "processing"; collapsed = false; panel.classList.remove("collapsed");
+    document.querySelectorAll(".display").forEach((d) => d.classList.remove("recording"));
+    talkingTile(); renderHead();
+    const steps = ["离线版重新转写", "区分说话人", "生成会议笔记", `保存到 ~/Meetings/`];
+    let k = 0;
+    const draw = () => {
+      pBody.innerHTML = `<div class="progress">${steps.map((s, i) => `<div class="step ${i < k ? "done" : i === k ? "active" : ""}"><i>${i < k ? "✓" : ""}</i>${s}</div>`).join("")}<div class="bar"><span style="width:${(k / steps.length) * 100}%"></span></div><span class="note-meta">两路音频已保存，整理通常需要几十秒。</span></div>`;
+    };
+    draw(); placePanel();
+    const iv = setInterval(() => {
+      k += 1; draw();
+      if (k >= steps.length) { clearInterval(iv); setTimeout(showDetail, 350 / speed); }
+    }, 700 / speed);
+  }
+
+  // ---------- detail window ----------
+  let detailDisplay = "d1";
+  function showDetail() {
+    state = "done"; panel.hidden = true;
+    const pos = store.get(POS_KEY); detailDisplay = pos?.display || "d1";
+    renderDetail(); detail.hidden = false; placeDetail();
+    toast("会议记录已保存", "~/Meetings/2026-10-30 1400 Voxlet 周会/");
+  }
+  function placeDetail() {
+    if (detail.hidden) return;
+    const d = displays().find((x) => x.dataset.id === detailDisplay) || displays()[0];
+    const r = screenRect(d);
+    const w = Math.min(r.width - 16, 760), h = r.height - 16;
+    detail.style.width = w + "px"; detail.style.height = h + "px";
+    detail.style.left = r.left + (r.width - w) / 2 + "px"; detail.style.top = r.top + 8 + "px";
+  }
+  function colorOf(s) { return s === "me" ? "var(--me)" : s === "S1" ? "var(--s1)" : "var(--s2)"; }
+  function markdown() {
+    const n = notesFor(lines.length, names);
+    const L = [`# Voxlet 周会`, ``, `2026-10-30 14:00 · ${fmt(sec)} · ${names.S1}、${names.S2}、${names.me}`, ``];
+    const add = (t, a) => { if (a.length) { L.push(`## ${t}`, ...a, ""); } };
+    add("议题", n.议题.map((x) => `- ${x}`));
+    add("决定", n.决定.map((x) => `- ${x}`));
+    add("待办", n.待办.map((x) => `- [ ] ${x.t} @${x.by}`));
+    add("各人观点", n.观点.map((x) => `- ${x}`));
+    add("标记", lines.filter((l) => l.starred).map((l) => `- ${clock(Math.floor(l.sec))} ${l.s === "me" ? names.me : names[l.s]}：${l.t}`));
+    return L.join("\n");
+  }
+  function renderDetail() {
+    const n = notesFor(lines.length, names);
+    const opt = (s) => {
+      const list = s === "me" ? ["Seiry", "我"] : [...new Set([names[s], ...NAMES[s]])];
+      return `<select data-spk="${s}" aria-label="${s === "me" ? "我的名字" : "发言人名字"}">${list.map((x) => `<option ${x === names[s] ? "selected" : ""}>${esc(x)}</option>`).join("")}</select>`;
+    };
+    const block = (title, items) => items.length ? `<h2>${title}</h2><ul>${items.join("")}</ul>` : "";
+    detail.innerHTML = `
+      <div class="d-bar"><span class="lights"><i id="dClose" title="关闭"></i><i></i><i></i></span>
+        <span class="d-title">Voxlet 周会</span><span class="d-meta">10月30日 14:00 · ${fmt(sec)} · ${lines.length} 句</span></div>
+      <div class="speakers"><span class="lab">发言人</span>
+        <span class="spk"><span class="swatch" style="background:var(--s1)"></span>说话人 1 ${opt("S1")}<span class="guess">根据“王总你看呢”推断</span></span>
+        <span class="spk"><span class="swatch" style="background:var(--s2)"></span>说话人 2 ${opt("S2")}</span>
+        <span class="spk"><span class="swatch" style="background:var(--me)"></span>我 ${opt("me")}</span></div>
+      <div class="d-cols">
+        <div class="d-col md"><h3>笔记</h3>
+          ${block("议题", n.议题.map((x) => `<li>${esc(x)}</li>`))}
+          ${block("决定", n.决定.map((x) => `<li>${esc(x)}</li>`))}
+          ${block("待办", n.待办.map((x) => `<li class="todo">☐ ${esc(x.t)} <span class="guess">@${esc(x.by)}</span></li>`))}
+          ${block("各人观点", n.观点.map((x) => `<li>${esc(x)}</li>`))}
+          ${block("标记", lines.filter((l) => l.starred).map((l) => `<li>${clock(Math.floor(l.sec))} ${esc(l.t)}</li>`))}
+        </div>
+        <div class="d-col"><h3>完整转写（会后离线重跑）</h3>
+          ${lines.map((l) => `<div class="tline${l.starred ? " starred" : ""}"><span class="ts">${clock(Math.floor(l.sec))}</span><span class="nm" style="color:${colorOf(l.s)}">${esc(l.s === "me" ? names.me : names[l.s])}</span><span class="tx">${esc(l.t)}</span></div>`).join("") || `<div class="empty">这场会议没有录到说话。</div>`}
+        </div>
+      </div>
+      <div class="d-foot"><span class="path">~/Meetings/2026-10-30 1400 Voxlet 周会/</span>
+        <button class="btn" id="dRegen">重新生成笔记</button><button class="btn" id="dFinder">在 Finder 中显示</button><button class="btn primary" id="dCopy">复制 Markdown</button></div>`;
+    detail.querySelectorAll("select[data-spk]").forEach((s) => (s.onchange = () => { names[s.dataset.spk] = s.value; renderDetail(); }));
+    $("dClose").onclick = () => { detail.hidden = true; state = "idle"; renderMenu(); };
+    $("dFinder").onclick = () => toast("在 Finder 中显示", "原型里打不开 Finder，原生版会直接定位到这个文件夹。");
+    $("dRegen").onclick = () => toast("正在重新生成笔记", "使用改过的发言人名字，用 gemini-3.8-flash。");
+    $("dCopy").onclick = async () => {
+      const md = markdown();
+      try { await navigator.clipboard.writeText(md); toast("已复制", "笔记已作为 Markdown 复制到剪贴板。"); }
+      catch { toast("复制没有成功", "这个查看器不允许写剪贴板，原生版不受影响。"); }
+    };
+  }
+
+  // ---------- toasts and prototype controls ----------
+  let toastTimer;
+  function toast(title, body) {
+    const t = $("toast");
+    t.innerHTML = `<b>${esc(title)}</b><span>${esc(body)}</span>`; t.hidden = false;
+    const pos = store.get(POS_KEY); const d = displays().find((x) => x.dataset.id === (pos?.display || "d1")) || displays()[0];
+    const r = screenRect(d);
+    t.style.left = r.left + r.width - Math.min(300, r.width - 20) - 10 + "px"; t.style.right = "auto"; t.style.top = r.top + 6 + "px";
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 3200);
+  }
+  function setPressed(a, b, v) { $(a).setAttribute("aria-pressed", String(v)); $(b).setAttribute("aria-pressed", String(!v)); }
+  $("outSpk").onclick = () => { headphones = false; setPressed("outSpk", "outHp", true); $("chips").innerHTML = chipsHTML(); if (state === "recording") toast("已开启回声消除", "检测到扬声器输出，会议声音会小一点。"); };
+  $("outHp").onclick = () => { headphones = true; setPressed("outSpk", "outHp", false); $("chips").innerHTML = chipsHTML(); if (state === "recording") toast("已关闭回声消除", "检测到耳机，麦克风不再处理，会议音量恢复。"); };
+  $("sp1").onclick = () => { speed = 1; setPressed("sp1", "sp3", true); };
+  $("sp3").onclick = () => { speed = 3; setPressed("sp1", "sp3", false); };
+  $("shareBtn").onclick = () => {
+    sharing = !sharing; $("shareBtn").setAttribute("aria-pressed", String(sharing));
+    const d1 = displays()[0]; d1.classList.toggle("sharing", sharing);
+    d1.querySelector(".share-tag")?.remove();
+    if (sharing) d1.querySelector(".screen").insertAdjacentHTML("beforeend", `<span class="share-tag">正在共享这块屏幕 · 悬浮窗不会出现在共享画面里</span>`);
+    $("chips").innerHTML = chipsHTML();
+  };
+
+  renderMenu();
+  if (collapsed) $("collapseBtn").setAttribute("aria-label", "展开");
+})();
+</script>
