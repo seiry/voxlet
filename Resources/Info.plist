@@ -35,6 +35,8 @@
 	<true/>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>In meeting mode, Voxlet records what your browser plays so the other side of the call is transcribed.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Voxlet records your voice while the dictation shortcut is active and streams it to Gemini for transcription.</string>
 </dict>

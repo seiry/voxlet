@@ -8,6 +8,9 @@ enum VoxletMain {
         if arguments.contains("--selftest") {
             exit(SelfTest.run(arguments: arguments))
         }
+        if arguments.contains("--tap-selftest") {
+            exit(TapSelfTest.run(arguments: arguments))
+        }
         if arguments.contains("--render-previews") {
             exit(PreviewRenderer.run(arguments: arguments))
         }
